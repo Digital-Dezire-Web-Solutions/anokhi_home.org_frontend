@@ -215,7 +215,7 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
               </div>
             )}
           </div>
-          {mood !== "admin" && (
+          {/* {mood !== "admin" && (
             <>
               <Floating />
               <div
@@ -225,8 +225,8 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
                 <span>Offers & Bonenza</span>
               </div>
             </>
-          )}
-          <div
+          )} */}
+          {/* <div
             className={`sidebar-overlay ${sidebarOpen ? "active" : ""}`}
             onClick={() => setSidebarOpen(false)}
           >
@@ -240,7 +240,7 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
                 <PosterView offersData={offersData} />
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
