@@ -316,6 +316,7 @@ const LeadTable = ({
       const payload = {
         lead: item._id,
         customer: item.customer,
+        agent: item.agent._id,
         location: selectedColonies[0]?.locationId?._id,
         colonies: selectedColonies.map((c) => c._id),
         visitDate:
@@ -359,7 +360,7 @@ const LeadTable = ({
       a.name.toLowerCase().includes(agentSearch.toLowerCase()) ||
       a.phone.includes(agentSearch),
   );
-  // console.log(mood, "item")
+  console.log(item, "item");
   const isSystemNote = (text) => {
     return text?.toLowerCase().includes("accepted by");
   };
@@ -369,7 +370,7 @@ const LeadTable = ({
   return (
     <div>
       <div className="table-row" key={item._id}>
-        <span>{index+1}</span>
+        <span>{index + 1}</span>
         <span>{formatDate(item.createdAt)}</span>
         <span>{item.name}</span>
         <span>{item.phone}</span>
@@ -405,6 +406,19 @@ const LeadTable = ({
             ) : (
               ""
             ))}
+          {mood === "admin" && item?.status === "assigned" && (
+            <div className="modal-actions">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setViewOpen(true);
+                  setPanelMode("siteVisit");
+                }}
+              >
+                Add Site Visit
+              </button>
+            </div>
+          )}
         </span>
         <span>
           <span
@@ -490,6 +504,8 @@ const LeadTable = ({
                 setSelectedLead(item);
                 setDeleteOpen(true);
               }}
+              showEdit={true}
+              showDelete={true}
             />
           )}
         </div>
@@ -808,7 +824,7 @@ const LeadTable = ({
           )}
           {panelMode === "siteVisit" && (
             <>
-              <h4>Request Site Visit</h4>
+              <h4>Add Site Visit</h4>
 
               <div className="field">
                 <label>Date of Visit</label>
@@ -914,7 +930,7 @@ const LeadTable = ({
                     handleRequestSiteVisit();
                   }}
                 >
-                  Submit Request
+                  Submit
                 </button>
               </div>
             </>

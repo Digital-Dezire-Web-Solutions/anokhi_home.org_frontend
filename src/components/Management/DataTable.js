@@ -17,7 +17,7 @@ import NiClosseye from "../../icons/ni-closseye";
 import NiOpenEye from "../../icons/ni-openEye";
 import LeadTable from "../Tables/LeadTable";
 
-const ITEMS_PER_PAGE = 15;
+const ITEMS_PER_PAGE = 50;
 
 const DataTable = ({ data, mood, setAlert }) => {
   const dispatch = useDispatch();
@@ -354,7 +354,7 @@ const DataTable = ({ data, mood, setAlert }) => {
           {paginatedData.length === 0 ? (
             <p>No Leads Found</p>
           ) : (
-            paginatedData.map((item, index) => (
+            paginatedData?.reverse().map((item, index) => (
               <LeadTable
                 item={item}
                 index={index}

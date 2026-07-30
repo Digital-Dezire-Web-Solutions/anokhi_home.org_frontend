@@ -198,6 +198,8 @@ const PaymentsTable = ({
               onDelete={() => {
                 setDeleteOpen(true);
               }}
+              showEdit={false}
+              showDelete={true}
             />
           )}
         </div>

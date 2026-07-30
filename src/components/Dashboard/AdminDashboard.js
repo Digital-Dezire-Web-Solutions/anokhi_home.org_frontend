@@ -22,7 +22,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect } from "react";
 import BookingTable from "../Tables/BookingTable";
-import PaymentTable from "../Tables/PaymentTable";
+import PaymentsTable from "../Tables/PaymentsTable";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -149,7 +149,7 @@ const AdminDashboard = () => {
                 payment
                   .slice(0, 5)
                   .map((item, index) => (
-                    <PaymentTable
+                    <PaymentsTable
                       item={item}
                       index={index}
                       dashboard={() => navigate("/bookings")}

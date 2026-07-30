@@ -19,7 +19,7 @@ import Host from "../../Host/Host";
 import SiteVisitTable from "../Tables/SiteVisitTable";
 // import "./SiteVisit.css";
 
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE = 50;
 
 const VisitTable = ({ data, mood, setAlert, landingPage }) => {
   const dispatch = useDispatch();
@@ -248,7 +248,7 @@ const VisitTable = ({ data, mood, setAlert, landingPage }) => {
           {paginated.length === 0 ? (
             <p>No Leads Found</p>
           ) : (
-            paginated.map((item, index) => (
+            paginated?.reverse().map((item, index) => (
               <SiteVisitTable
                 item={item}
                 index={index}

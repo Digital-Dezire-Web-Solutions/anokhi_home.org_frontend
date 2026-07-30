@@ -14,7 +14,7 @@ import { formatCurrency } from "../Utils/FormatCurrency";
 import AddPaymentForm from "../UserForm/AddPaymentForm";
 import PaymentsTable from "../Tables/PaymentsTable";
 
-const ITEMS_PER_PAGE = 15;
+const ITEMS_PER_PAGE = 50;
 
 const PaymentTable = ({ data, mood, setAlert }) => {
   const dispatch = useDispatch();

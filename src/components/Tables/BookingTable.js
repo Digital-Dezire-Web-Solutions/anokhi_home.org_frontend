@@ -1,42 +1,3 @@
-// import React from "react";
-// import formatDate from "../DateFormate/DateFormate";
-// import { formatCurrency } from "../Utils/FormatCurrency";
-
-// const BookingTable = ({ index, item, mood }) => {
-//   return (
-//     <div key={item.id} className="dashboard-row">
-//       <span>{index + 1}</span>
-//       <span>{formatDate(item?.createdAt)}</span>
-//       <span>{item?.customer?.name}</span>
-//       <span>
-//         {item?.plot?.plotNumber}, {item?.colony?.name}, {item?.location?.name}
-//       </span>
-//       {mood !== "agent" && <span>{item?.agent?.name}</span>}
-//       <span>{formatCurrency(item?.plotArea)} sqft</span>
-//       <span>₹{item?.pricePerSqft}/sqft</span>
-//       <span>₹{formatCurrency(item?.requestAmount)}/sqft</span>
-//       <span>₹{formatCurrency(item?.finalAmount)}</span>
-//       <span
-//         className={`status ${
-//           item.status === "confirmed"
-//             ? "active"
-//             : item.status === "pending"
-//               ? "pending"
-//               : item.status === "approval"
-//                 ? "pending2"
-//                 : item.status === "rejected"
-//                   ? "failed"
-//                   : ""
-//         }`}
-//       >
-//         {item.status}
-//       </span>
-//     </div>
-//   );
-// };
-
-// export default BookingTable;
-
 import React, { useEffect, useState } from "react";
 import NiOpenEye from "../../icons/ni-openEye";
 import NiDots from "../../icons/ni-dots";
@@ -80,7 +41,7 @@ const BookingTable = ({
   const [formData, setFormData] = useState({});
   const [panelMode, setPanelMode] = useState(null);
   const [timeline, setTimeline] = useState([]);
-  const [saving, setSaving] = useState([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!viewOpen) {
@@ -451,7 +412,7 @@ const BookingTable = ({
 
   // console.log(paymentSummary, "paymentSummary");
   // console.log(bookingPaid, "bookingPaid")
-
+  console.log(saving, "saving");
   return (
     <>
       <div>
@@ -465,9 +426,27 @@ const BookingTable = ({
           </span>
           {mood !== "agent" && <span>{item?.agent?.name}</span>}
           {/* <span>{formatCurrency(item?.plotArea)} sqft</span> */}
-          <span>₹{item?.pricePerSqft}/sqft</span>
+
           <span>₹{formatCurrency(item?.requestAmount)}/sqft</span>
           <span>₹{formatCurrency(item?.finalAmount)}</span>
+          <span>
+            {item.status === "pending" &&
+              mood !== "user" &&
+              panelMode !== "payment" && (
+                <div class="modal-actions">
+                  <button
+                    className="view-report-btn"
+                    onClick={() => {
+                      setViewOpen(true);
+                      setPanelMode("payment");
+                      setShowReport(false);
+                    }}
+                  >
+                    Add Payment
+                  </button>
+                </div>
+              )}
+          </span>
           <span
             className={`status ${
               item.status === "confirmed"
@@ -514,6 +493,8 @@ const BookingTable = ({
                   setOpen(true);
                 }}
                 onDelete={() => setDeleteOpen(true)}
+                showEdit={false}
+                showDelete={true}
               />
             )}
           </div>
@@ -672,15 +653,12 @@ const BookingTable = ({
 
         <div className="modal-actions">
           <button
-            disabled={saving}
+            // disabled={saving}
             onClick={(e) => {
               e.stopPropagation();
-
               setDeleteOpen(false);
-
               handleDeleteBooking(item._id);
             }}
-            disabled={saving}
           >
             Yes
           </button>
@@ -803,7 +781,7 @@ const BookingTable = ({
                   setShowReport(false);
                 }}
               >
-                Book Now
+                Add Payment
               </button>
             </div>
           )}

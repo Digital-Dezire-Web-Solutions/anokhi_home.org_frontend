@@ -49,7 +49,7 @@ function Sidebar({dark, closeMobile, mood }) {
       { path: "/management", label: "Lead Mgnt.", icon: <NiManagement /> },
       { path: "/site-visits", label: "Site Visits", icon: <NiSitevisit /> },
       { path: "/plot", label: "Plots", icon: <NiTool /> },
-      { path: "/holdplot", label: "Hold Plots", icon: <NiTool /> },
+      // { path: "/holdplot", label: "Hold Plots", icon: <NiTool /> },
       { path: "/bookings", label: "Bookings", icon: <NiBooking /> },
 
       {

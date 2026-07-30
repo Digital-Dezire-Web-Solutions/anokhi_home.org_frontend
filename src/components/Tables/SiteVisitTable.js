@@ -274,6 +274,7 @@ const SiteVisitTable = ({
           sitevisitId: item._id, // 🔥 IMPORTANT
           customer: item.customer._id,
           location: item.location?._id,
+          agent:item.agent._id,
           colony: selectedColony._id,
           plot: selectedPlot._id, // 🔥 IMPORTANT
 
@@ -293,6 +294,7 @@ const SiteVisitTable = ({
         },
       );
 
+      console.log(res,"res")
       setAlert({
         message: "Booking created successfully",
         status: "Success",
@@ -310,6 +312,7 @@ const SiteVisitTable = ({
       setTimeout(() => setAlert(null), 3000);
     } catch (err) {
       console.error(err);
+      console.log(err,"err")
       setAlert({
         message: err.response?.data?.message || "Booking failed",
         status: "Error",
@@ -319,6 +322,7 @@ const SiteVisitTable = ({
     }
   };
 
+//   console.log(selectedPlot,"selectedPlot")
   const handleDeleteVisit = async (visitId) => {
     try {
       const token = localStorage.getItem("token");
@@ -382,7 +386,7 @@ const SiteVisitTable = ({
     // onClose();
   };
 
-  console.log(item, "item");
+//   console.log(item, "item");
   return (
     <div>
       <div className="table-row" key={item._id}>
@@ -404,7 +408,7 @@ const SiteVisitTable = ({
                   setShowReport(false);
                 }}
               >
-                Request Booking
+                Add Booking
               </button>
             </div>
           )}
@@ -450,6 +454,8 @@ const SiteVisitTable = ({
               onDelete={() => {
                 setDeleteOpen(true);
               }}
+              showEdit={false}
+                showDelete={true}
             />
           )}
         </div>
@@ -645,8 +651,6 @@ const SiteVisitTable = ({
             <p>{formatDate(item?.createdAt)}</p>
             <p>{item.customer.phone}</p>
             {mood !== "agent" && <p>{item.agent?.name || "-"}</p>}
-            <p>{item.customer.phone}</p>
-            {mood !== "agent" && <p>{item.agent?.name || "-"}</p>}
             <p>
               {" "}
               {item.colonies?.map((i) => (
@@ -684,14 +688,14 @@ const SiteVisitTable = ({
                 setShowReport(false);
               }}
             >
-              Request Booking
+              Add Booking
             </button>
           </div>
         )}
         <div className={`report-view-box-right ${panelMode ? "active" : ""}`}>
           {panelMode === "booking" && (
             <>
-              <h4>Request Booking</h4>
+              <h4>Add Booking</h4>
               <div className="field">
                 <label>Colony</label>
 
@@ -956,7 +960,7 @@ const SiteVisitTable = ({
                     handleAddBooking();
                   }}
                 >
-                  Submit Request
+                  Submit 
                 </button>
               </div>
             </>
