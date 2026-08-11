@@ -82,9 +82,9 @@ const Login = ({ mood }) => {
           {loading ? "Signing in..." : "Sign In"}
         </button>
 
-        {/* <p className="auth-footer">
+        <p className="auth-footer">
           New user? <Link to="/role">Sign up</Link>
-        </p> */}
+        </p>
       </div>
     </div>
   );
