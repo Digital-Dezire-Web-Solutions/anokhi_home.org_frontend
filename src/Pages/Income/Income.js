@@ -267,6 +267,7 @@ const Income = ({ mood, setAlert }) => {
                   <span>Name</span>
                   <span>Income Type</span>
                   <span>Amount</span>
+                  <span>Company</span>
                   <span>From</span>
                   <span>Status</span>
                   <span>Action</span>
@@ -290,6 +291,7 @@ const Income = ({ mood, setAlert }) => {
                           .replace(/\b\w/g, (l) => l.toUpperCase())}
                       </span>
                       <span>₹{formatCurrency(item.amount)}</span>
+                      <span>{item?.payment?.booking?.colony?.category || "-"}</span>
                       <span>
                         {item?.type !== "referal_income"
                           ? `${item?.payment?.customer?.name} (${item?.payment?.customer?.referralId})` ||

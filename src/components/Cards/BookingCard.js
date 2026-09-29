@@ -681,7 +681,6 @@ const BookingCard = ({
 
               handleDeleteBooking(item._id);
             }}
-            disabled={saving}
           >
             Yes
           </button>

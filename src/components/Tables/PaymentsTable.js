@@ -138,7 +138,7 @@ const PaymentsTable = ({
           {item?.booking ? (
             <>
               {item?.booking?.plot?.plotNumber}, {item?.booking?.colony?.name},{" "}
-              {item?.booking?.location?.name}
+              {item?.booking?.location?.name} ({item?.booking?.colony?.category})
             </>
           ) : (
             "-"
@@ -354,6 +354,7 @@ const PaymentsTable = ({
           <div className="user-card-bottom-left">
             <p>Payment Date</p>
             <p>Plot</p>
+            <p>Company</p>
             <p>Amount Paid</p>
             <p>Mode</p>
             <p>Payment Type</p>
@@ -365,9 +366,10 @@ const PaymentsTable = ({
           <div className="user-card-bottom-right">
             <p>{formatDate(item?.createdAt)}</p>
             <p>
-              {item?.booking?.plot?.plotId}, {item?.booking?.colony?.name},{" "}
+              {item?.booking?.plot?.plotNumber}, {item?.booking?.colony?.name},{" "}
               {item?.booking?.location?.name}
             </p>
+            <p>{item?.booking?.colony?.category}</p>
             <p>₹{formatCurrency(item.amount)}</p>
             <p>{item.paymentMode}</p>
             <p>{item.paymentType}</p>

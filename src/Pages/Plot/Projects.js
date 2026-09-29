@@ -37,6 +37,7 @@ const Projects = ({ mood, setAlert }) => {
     image: "",
     area: "",
     priceRange: "",
+    category: "",
   });
 
   useEffect(() => {
@@ -46,6 +47,7 @@ const Projects = ({ mood, setAlert }) => {
         image: selectedProject.image || "",
         area: selectedProject.area || "",
         priceRange: selectedProject.priceRange || "",
+        category: selectedProject.category || "",
       });
     } else {
       setFormData({
@@ -53,6 +55,7 @@ const Projects = ({ mood, setAlert }) => {
         image: "",
         area: "",
         priceRange: "",
+        category: "",
       });
     }
   }, [selectedProject]);
@@ -95,6 +98,7 @@ const Projects = ({ mood, setAlert }) => {
         name: formData.name,
         image: imageUrl,
         area: formData.area,
+        category: formData.category,
         priceRange: formData.priceRange,
         locationId: plotId,
       };
@@ -119,6 +123,7 @@ const Projects = ({ mood, setAlert }) => {
         name: "",
         image: "",
         area: "",
+        category: "",
         priceRange: "",
       });
       setTimeout(() => setAlert(null), 3000);
@@ -152,6 +157,7 @@ const Projects = ({ mood, setAlert }) => {
         name: formData.name,
         image: imageUrl,
         area: formData.area,
+        category: formData.category,
         priceRange: formData.priceRange,
       };
 
@@ -316,10 +322,28 @@ const Projects = ({ mood, setAlert }) => {
             image: "",
             area: "",
             priceRange: "",
+            category: "",
           });
         }}
         title={isEditMode ? "Edit Project" : "Add Project"}
       >
+        <div className="field">
+          <label>Category</label>
+
+          <select
+            value={formData.category}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                category: e.target.value,
+              })
+            }
+          >
+            <option value="">Select Category</option>
+            <option value="Anokhi Homes">Anokhi Homes</option>
+            <option value="Patliputra">Patliputra</option>
+          </select>
+        </div>
         <div className="field">
           <label>Project Name</label>
 
@@ -335,20 +359,6 @@ const Projects = ({ mood, setAlert }) => {
           />
         </div>
 
-        {/* <div className="field">
-          <label>Image</label>
-
-          <input
-            value={formData.image}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                image: e.target.value,
-              })
-            }
-            placeholder="Image"
-          />
-        </div> */}
         <div className="field">
           <label>Image</label>
 

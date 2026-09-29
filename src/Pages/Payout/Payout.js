@@ -1,46 +1,51 @@
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import React, { useEffect, useMemo, useState } from "react";
 import Breadcrumb from "../../components/Breadcrumb/Breadcrumb";
 import DashboardCard from "../../components/Cards/DashboardCard";
 import NiPayments from "../../icons/ni-payments";
-import PaymentCard from "../../components/Cards/PaymentCard";
-import {
-  getAccountDetails,
-  getAllColonies,
-  getExpense,
-  getIncome,
-  getLedger,
-  getPayout,
-  getPlots,
-} from "../../Redux/Slices/AppSlices";
+import { getAccountDetails, getPayout } from "../../Redux/Slices/AppSlices";
 import { useDispatch, useSelector } from "react-redux";
 import NiSearch from "../../icons/ni-search";
-import InvoiceCard from "../../components/Cards/InvoiceCard";
 import { formatCurrency } from "../../components/Utils/FormatCurrency";
 import formatDate from "../../components/DateFormate/DateFormate";
 import "./Payout.css";
 import NiOpenEye from "../../icons/ni-openEye";
 import ViewModal from "../../components/Modals/ViewModal";
-import NiEdit from "../../icons/ni-edit";
-import NiDelete from "../../icons/ni-delete";
 import Host from "../../Host/Host";
 import axios from "axios";
 import AddLocationModal from "../../components/Modals/AddLocationModal";
-import DeleteModal from "../../components/Modals/DeleteModal";
-import NiDots from "../../icons/ni-dots";
-import ActionModal from "../../components/Modals/ActionModal";
-import { LucidePlus } from "lucide-react";
 import { uploadImage } from "../LandingSetting/LandingApi";
-import SearchSelect from "../../components/SearchItems/SearchSelect";
-import NiCredit from "../../icons/ni-credit";
-import NiDebit from "../../icons/ni-debit";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
+
+const STATUS_OPTIONS = ["hold", "released", "paid", "cancelled"];
+const PAYABLE_STATUSES = ["hold", "released"];
+const INCOME_TYPE_LABELS = {
+  direct_income: "Direct Income",
+  difference_income: "Difference Income",
+  matching_income: "Matching Income",
+  royalty_income: "Royalty Income",
+  cashback_income: "Cashback Income",
+  best_performance_income: "Best Performance Income",
+  festival_bonus_income: "Festival Bonus Income",
+  referal_income: "Referral Income",
+  reward_income: "Reward Income",
+};
+const CATEGORY_DISPLAY_LABELS = {
+  "Anokhi Homes": "Anokhi Homes + Other",
+  Patliputra: "Patliputra",
+};
 
 const Payout = ({ mood, setAlert }) => {
   const dispatch = useDispatch();
-  const { userDetail, payout } = useSelector((state) => state.app);
+  const { payout } = useSelector((state) => state.app);
   const [search, setSearch] = useState("");
   const [viewOpen, setViewOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [selectedExpense, setSelectedExpense] = useState(null);
+  const [expenseDetail, setExpenseDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const ITEMS_PER_PAGE = 25;
@@ -48,41 +53,37 @@ const Payout = ({ mood, setAlert }) => {
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
   const [cycleFilter, setCycleFilter] = useState("");
-
-  const [formData, setFormData] = useState({
-    amount: "",
-    paymentMode: "",
-    transactionId: "",
-    chequeNumber: "",
-    bankName: "",
-    attachment: "",
-    remarks: "",
+  const [activeTab, setActiveTab] = useState("summary");
+  const [formData, setFormData] = useState({});
+  const [noteImage, setNoteImage] = useState(null);
+  const [payCategory, setPayCategory] = useState(null);
+  const [imageModal, setImageModal] = useState({
+    open: false,
+    src: "",
   });
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportCycle, setExportCycle] = useState("");
 
   useEffect(() => {
     dispatch(getAccountDetails());
     dispatch(getPayout());
   }, []);
-  // console.log(forSalePlots, "forSalePlots");
+
   const summary = useMemo(() => {
     const data = payout || [];
 
     return {
-      payable: data
-        .filter((i) => i.status === "payable")
-        .reduce((s, i) => s + i.balance, 0),
+      released: data
+        ?.filter((i) => i.status === "released")
+        ?.reduce((s, i) => s + (i.netAmount || 0), 0),
 
-      partial: data
-        .filter((i) => i.status === "partial")
-        .reduce((s, i) => s + i.balance, 0),
+      paid: data
+        ?.filter((i) => i.status === "paid")
+        ?.reduce((s, i) => s + (i.netAmount || 0), 0),
 
-      processing: data
-        .filter((i) => i.status === "processing")
-        .reduce((s, i) => s + i.balance, 0),
-
-      hold: data
-        .filter((i) => i.status === "hold")
-        .reduce((s, i) => s + i.balance, 0),
+      cancelled: data
+        ?.filter((i) => i.status === "cancelled")
+        ?.reduce((s, i) => s + (i.netAmount || 0), 0),
     };
   }, [payout]);
 
@@ -109,7 +110,6 @@ const Payout = ({ mood, setAlert }) => {
 
       const matchSearch =
         item.user?.name?.toLowerCase().includes(keyword) ||
-        item.user?.phone?.includes(search) ||
         item.user?.referralId?.toLowerCase().includes(keyword);
 
       const matchFrom =
@@ -128,133 +128,446 @@ const Payout = ({ mood, setAlert }) => {
     page * ITEMS_PER_PAGE,
   );
 
-  const handleFileUpload = (field, file) => {
-    if (!file) return;
+  const fetchPayoutDetail = async (item) => {
+    setExpenseDetail(null);
+    setDetailLoading(true);
 
-    const MAX_SIZE = 20 * 1024 * 1024;
-
-    if (file.size > MAX_SIZE) {
-      setAlert({
-        message: "Image size should not exceed 20 MB",
-        status: "Error",
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(`${Host}/api/payout/${item._id}`, {
+        headers: { "auth-token": token },
       });
+      setExpenseDetail(res.data);
+      return res.data;
+    } catch (err) {
+      console.log(err);
+      setAlert({
+        status: "Error",
+        message: "Unable to load payout details.",
+      });
+      setTimeout(() => setAlert(null), 3000);
+      return null;
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
+  const openView = async (item) => {
+    setSelectedExpense(item);
+    setViewOpen(true);
+    await fetchPayoutDetail(item);
+  };
+
+  const openDirectPay = async (item) => {
+    setSelectedExpense(item);
+    setPayCategory(null); // let the admin choose in the modal
+    setFormData({});
+    setNoteImage(null);
+
+    const detail = await fetchPayoutDetail(item);
+
+    // preselect the first still-pending category as a convenience default
+    const firstPending = detail?.categoryBreakdown?.find(
+      (c) => c.status !== "paid" && c.grossAmount > 0,
+    );
+    if (firstPending) {
+      setPayCategory(firstPending.category);
+    }
+
+    setOpen(true);
+  };
+
+  // const openView = async (item) => {
+  //   setSelectedExpense(item);
+  //   setViewOpen(true);
+  //   setExpenseDetail(null);
+  //   setDetailLoading(true);
+
+  //   try {
+  //     const token = localStorage.getItem("token");
+  //     const res = await axios.get(`${Host}/api/payout/${item._id}`, {
+  //       headers: { "auth-token": token },
+  //     });
+  //     setExpenseDetail(res.data);
+  //   } catch (err) {
+  //     console.log(err);
+  //     setAlert({
+  //       status: "Error",
+  //       message: "Unable to load payout details.",
+  //     });
+  //     setTimeout(() => setAlert(null), 3000);
+  //   }
+
+  //   setDetailLoading(false);
+  // };
+
+  console.log(expenseDetail?.categoryBreakdown, "expenseDetail")
+
+  const handlePay = async () => {
+    if (!payCategory) {
+      setAlert({ status: "Error", message: "Please select a category to pay." });
       setTimeout(() => setAlert(null), 3000);
       return;
     }
 
-    setFormData((prev) => ({
-      ...prev,
-      [field]: file,
-    }));
-  };
-
-  const handlePay = async () => {
     try {
       setSaving(true);
 
       const token = localStorage.getItem("token");
-
       let attachment = "";
-      if (formData.attachment) {
-              const upload = await uploadImage(formData.attachment);
-              attachment = upload.url;
-            }
+      if (noteImage) {
+        const upload = await uploadImage(noteImage);
+        attachment = upload.url;
+      }
 
-      await axios.post(
-        `${Host}/api/payout/pay/${selectedExpense._id}`,
-        {
-          amount: Number(formData.amount),
-          paymentMode: formData.paymentMode,
-          transactionId: formData.transactionId,
-          chequeNumber: formData.chequeNumber,
-          bankName: formData.bankName,
-          attachment,
-          remarks: formData.remarks,
-        },
-        {
-          headers: {
-            "auth-token": token,
-          },
-        },
+      const payload = {
+        category: payCategory,
+        paymentMode: formData.mode,
+        transactionId: formData.transactionId || "",
+        attachment: attachment || "",
+      };
+
+      await axios.put(
+        `${Host}/api/payout/pay-category/${selectedExpense._id}`,
+        payload,
+        { headers: { "auth-token": token } },
       );
 
       dispatch(getPayout());
 
+      if (viewOpen) {
+        await fetchPayoutDetail(selectedExpense);
+      }
+
       setAlert({
         status: "Success",
-        message: "Payout completed successfully.",
+        message: `${CATEGORY_DISPLAY_LABELS[payCategory] || payCategory} payout marked as paid.`,
       });
-
       setTimeout(() => setAlert(null), 3000);
 
       setOpen(false);
-
-      setFormData({
-        amount: "",
-        paymentMode: "",
-        transactionId: "",
-        chequeNumber: "",
-        bankName: "",
-        attachment: "",
-        remarks: "",
-      });
+      setPayCategory(null);
     } catch (err) {
       console.log(err);
-
       setAlert({
         status: "Error",
-        message: err.response?.data?.msg || "Unable to complete payout.",
+        message: err.response?.data?.message || "Unable to complete payout.",
       });
-
       setTimeout(() => setAlert(null), 3000);
     }
 
     setSaving(false);
   };
 
+
+  const getExportUsers = () => {
+    if (!payout || !Array.isArray(payout)) {
+      return [];
+    }
+
+    if (!exportCycle) {
+      return payout;
+    }
+
+    return payout.filter(
+      (item) => `${item.cycleStart}_${item.cycleEnd}` === exportCycle,
+    );
+  };
+
+  /* =====================================================
+     FORMAT USER DATA FOR EXPORT
+  ===================================================== */
+
+  const getExportRows = () => {
+    const selectedUsers = getExportUsers();
+
+    return selectedUsers.map((item) => {
+      return {
+        Name: item?.user?.name || "-",
+        Phone: item?.user?.phone || "-",
+        Email: item?.user?.email || "-",
+        UserID: item?.user?.referralId || "-",
+        Cycle: `${formatDate(item.cycleStart)} - ${formatDate(item.cycleEnd)}`,
+        Gross: item?.grossAmount,
+        TDS: item?.tdsAmount,
+        AdminCharge: item?.adminChargeAmount,
+        Net: item?.netAmount,
+        Status: item?.status,
+        PaymentMode: item?.paymentMode || "-",
+        TransactionId: item?.transactionId || "-",
+      };
+    });
+  };
+
+  /* =====================================================
+     EXPORT EXCEL
+  ===================================================== */
+
+  const exportToExcel = () => {
+    const rows = getExportRows();
+
+    if (!rows.length) {
+      setAlert({
+        message: "No users found for selected filter",
+        status: "Error",
+      });
+
+      setTimeout(() => {
+        setAlert(null);
+      }, 3000);
+
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+
+    /* Auto column width */
+
+    const columnWidths = Object.keys(rows[0]).map((key) => {
+      const maxLength = Math.max(
+        key.length,
+        ...rows.map((row) =>
+          String(row[key] ?? "").length
+        )
+      );
+
+      return {
+        wch: Math.min(maxLength + 3, 40),
+      };
+    });
+
+    worksheet["!cols"] = columnWidths;
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Users"
+    );
+
+    // in exportToExcel:
+    const fileName = exportCycle
+      ? `payouts-${exportCycle.split("_")[0]?.slice(0, 10)}-to-${exportCycle.split("_")[1]?.slice(0, 10)}.xlsx`
+      : "all-payouts.xlsx";
+
+    XLSX.writeFile(workbook, fileName);
+
+    setAlert({
+      message: "Excel exported successfully",
+      status: "Success",
+    });
+
+    setTimeout(() => {
+      setAlert(null);
+    }, 3000);
+
+    setExportOpen(false);
+  };
+
+  /* =====================================================
+     EXPORT PDF
+  ===================================================== */
+
+  const exportToPDF = () => {
+    const rows = getExportRows();
+
+    if (!rows.length) {
+      setAlert({
+        message: "No users found for selected filter",
+        status: "Error",
+      });
+
+      setTimeout(() => {
+        setAlert(null);
+      }, 3000);
+
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const cycleLabel = cycles.find((c) => c.value === exportCycle)?.label;
+
+    const title = exportCycle ? `Payouts — ${cycleLabel}` : "All Payouts";
+
+    doc.setFontSize(18);
+    doc.text(title, 14, 15);
+
+    doc.setFontSize(9);
+    doc.text(
+      `Total Records: ${rows.length}`,
+      14,
+      22
+    );
+
+    const columns = Object.keys(rows[0]);
+
+    const body = rows.map((row) =>
+      columns.map((column) => row[column] ?? "-")
+    );
+
+    const columnStyles = {};
+
+    columns.forEach((column, index) => {
+      let width = 18;
+
+      switch (column) {
+        case "Name":
+          width = 20;
+          break;
+
+        case "Phone":
+          width = 17;
+          break;
+
+        case "Email":
+          width = 28;
+          break;
+
+        case "UserID":
+          width = 20;
+          break;
+
+        case "Cycle":
+          width = 20;
+          break;
+
+        case "Gross":
+          width = 28;
+          break;
+
+        case "TDS":
+          width = 17;
+          break;
+
+        case "Admin Charge":
+          width = 20;
+          break;
+
+        case "Net":
+          width = 25;
+          break;
+
+        case "Status":
+          width = 17;
+          break;
+
+        case "Payment Mode":
+          width = 20;
+          break;
+
+        case "Transaction Id":
+          width = 45;
+          break;
+
+        default:
+          width = 18;
+      }
+
+      columnStyles[index] = {
+        cellWidth: width,
+      };
+    });
+
+    autoTable(doc, {
+      head: [columns],
+      body,
+
+      startY: 27,
+
+      theme: "grid",
+
+      tableWidth: "wrap",
+
+      styles: {
+        fontSize: 5.5,
+        cellPadding: 1.2,
+        overflow: "linebreak",
+        valign: "middle",
+        halign: "left",
+        lineWidth: 0.1,
+      },
+
+      headStyles: {
+        fontSize: 5.5,
+        fontStyle: "bold",
+        valign: "middle",
+      },
+
+      bodyStyles: {
+        valign: "middle",
+      },
+
+      columnStyles,
+
+      margin: {
+        top: 27,
+        left: 5,
+        right: 5,
+        bottom: 8,
+      },
+    });
+
+
+    const fileName = exportCycle
+      ? `payouts-${exportCycle.split("_")[0]?.slice(0, 10)}-to-${exportCycle.split("_")[1]?.slice(0, 10)}.pdf`
+      : "all-payouts.pdf";
+
+    doc.save(fileName);
+
+    setAlert({
+      message: "PDF exported successfully",
+      status: "Success",
+    });
+
+    setTimeout(() => {
+      setAlert(null);
+    }, 3000);
+
+    setExportOpen(false);
+  };
+
   return (
     <div className="plot-container">
-      {/* <div className="table-filters">
+      <div className="table-filters">
         <div className="page-head-title">
           <h2>Payout</h2>
           <Breadcrumb />
         </div>
-      </div> */}
+      </div>
       <div className="dashboard-container">
         <div className="dashboard-wrapper">
           <div className="dashboard-grid">
             <DashboardCard
-              title="Payable"
-              value={`₹${formatCurrency(summary.payable)}`}
+              title="Released"
+              value={`₹${formatCurrency(summary.released)}`}
               icons={<NiPayments />}
             />
 
             <DashboardCard
-              title="Partial"
-              value={`₹${formatCurrency(summary.partial)}`}
+              title="Paid"
+              value={`₹${formatCurrency(summary.paid)}`}
               icons={<NiPayments />}
             />
 
             <DashboardCard
-              title="Processing"
-              value={`₹${formatCurrency(summary.processing)}`}
-              icons={<NiPayments />}
-            />
-
-            <DashboardCard
-              title="Hold"
-              value={`₹${formatCurrency(summary.hold)}`}
+              title="Cancelled"
+              value={`₹${formatCurrency(summary.cancelled)}`}
               icons={<NiPayments />}
             />
           </div>
-          <h4 style={{margin:"1rem 0"}}>Ledger History</h4>
+          <h4>Ledger History</h4>
           <div className="filter-grid page-tools table-filters">
             <div className="searchItem">
               <NiSearch />
 
               <input
-                placeholder="Search Project.... "
+                placeholder="Search associate...."
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -288,11 +601,11 @@ const Payout = ({ mood, setAlert }) => {
                 }}
               >
                 <option value="">All Status</option>
-                <option value="hold">Hold</option>
-                <option value="payable">Payable</option>
-                <option value="processing">Processing</option>
-                <option value="partial">Partial</option>
-                <option value="paid">Paid</option>
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="searchItem">
@@ -303,49 +616,55 @@ const Payout = ({ mood, setAlert }) => {
                   setPage(1);
                 }}
               >
-                <option value="">All Cycles</option>
-
                 {cycles.map((cycle) => (
                   <option key={cycle.value} value={cycle.value}>
                     {cycle.label}
                   </option>
                 ))}
+                <option value="">All Cycles</option>
               </select>
             </div>
+            <button
+              className="add-button"
+              onClick={() => {
+                setExportCycle("");
+                setExportOpen(true);
+              }}
+            >
+              <Download size={18} />
+              Export
+            </button>
           </div>
           <div className="card table-box">
             <div className="table payout-table">
               <div className="table-head">
                 <span>S.No</span>
                 <span>Associate</span>
-                <span>Referral ID</span>
                 <span>Cycle</span>
+                <span>Referral ID</span>
                 <span>Gross</span>
                 <span>TDS</span>
                 <span>Admin</span>
                 <span>Net</span>
-                <span>Balance</span>
                 <span>Status</span>
                 <span>Action</span>
               </div>
               {paginated?.length === 0 ? (
-                <div >
-                  <span>No Expense Found</span>
+                <div>
+                  <span>No Payout Found</span>
                 </div>
               ) : (
                 paginated?.map((item, index) => (
                   <div className="table-row" key={item._id}>
-                    <span>{index + 1}</span>
+                    <span>{(page - 1) * ITEMS_PER_PAGE + index + 1}</span>
 
                     <span>{item.user?.name}</span>
 
-                    <span>{item.user?.referralId}</span>
-
                     <span>
-                      {formatDate(item.cycleStart)}
-                      <br />
+                      {formatDate(item.cycleStart)} -{" "}
                       {formatDate(item.cycleEnd)}
                     </span>
+                    <span>{item.user?.referralId}</span>
 
                     <span>₹{formatCurrency(item.grossAmount)}</span>
 
@@ -355,35 +674,35 @@ const Payout = ({ mood, setAlert }) => {
 
                     <span>₹{formatCurrency(item.netAmount)}</span>
 
-                    <span>₹{formatCurrency(item.balance)}</span>
-
                     <span>
-                      <span className={`status ${item.status}`}>
+                      <span
+                        style={{ textTransform: "capitalize" }}
+                        className={`status ${item.status === "paid"
+                          ? "active"
+                          : item.status === "released"
+                            ? "pending"
+                            : "failed"
+                          }`}
+                      >
                         {item.status}
                       </span>
                     </span>
 
                     <div className="dots">
-                      <span
-                        onClick={() => {
-                          setSelectedExpense(item);
-                          setViewOpen(true);
-                        }}
-                      >
+                      <span onClick={() => openView(item)}>
                         <NiOpenEye />
                       </span>
-
-                      {(item.status === "payable" ||
-                        item.status === "partial") && (
-                        <button
-                          className="table-btn"
-                          onClick={() => {
-                            setSelectedExpense(item);
-                            setOpen(true);
-                          }}
-                        >
-                          Pay
-                        </button>
+                      {mood === "admin" && (
+                        <div className="modal-actions">
+                          {PAYABLE_STATUSES.includes(item.status) && (
+                            <button
+                              className="table-btn"
+                              onClick={() => openDirectPay(item)}
+                            >
+                              Pay
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -415,307 +734,455 @@ const Payout = ({ mood, setAlert }) => {
             </button>
           </div>
         </div>
+
         <ViewModal
           open={viewOpen}
           onClose={() => {
             setViewOpen(false);
             setSelectedExpense(null);
+            setExpenseDetail(null);
           }}
-          title="Transaction Details"
+          title="Payout Details"
         >
-          <p>
-            <strong>Associate :</strong>
-            {selectedExpense?.user?.name}
-          </p>
+          <div className="table-filters">
+            <button
+              className={activeTab === "summary" ? "active" : ""}
+              onClick={() => setActiveTab("summary")}
+            >
+              Summary
+            </button>
+            <button
+              className={activeTab === "classification" ? "active" : ""}
+              onClick={() => setActiveTab("classification")}
+            >
+              Classification
+            </button>
+            <button
+              className={activeTab === "history" ? "active" : ""}
+              onClick={() => setActiveTab("history")}
+            >
+              Income History
+            </button>
+          </div>
+          {activeTab === "classification" && (
+            <div className="report-view-box-right active">
+              {expenseDetail?.categoryDisplay?.map((i) => (
+                <div className="history-card" key={i._id}>
+                  <h5>{i.category}</h5>
+                  <p><strong>Gross Amount : </strong>₹{formatCurrency(i.grossAmount)}</p>
+                  <p><strong>Admin Charge : </strong>₹{formatCurrency(i.adminChargeAmount)}</p>
+                  <p><strong>TDS : </strong>₹{formatCurrency(i.tdsAmount)}</p>
+                  <p><strong>Net Amount : </strong>₹{formatCurrency(i.netAmount)}</p>
+                  <p>
+                    <strong>Status : </strong>
+                    <span
+                      style={{ textTransform: "capitalize" }}
+                      className={`status ${i.status === "paid" ? "active" : "pending"}`}
+                    >
+                      {i.status}
+                    </span>
+                  </p>
 
-          <p>
-            <strong>Phone :</strong>
-            {selectedExpense?.user?.phone}
-          </p>
+                  {i.status === "paid" ? (
+                    <>
+                      {i.paymentMode && <p><strong>Payment Mode : </strong>{i.paymentMode}</p>}
+                      {i.transactionId && <p><strong>Transaction Id : </strong>{i.transactionId}</p>}
+                      {i.paidAt && <p><strong>Paid At : </strong>{formatDate(i.paidAt)}</p>}
+                    </>
+                  ) : (
+                    i.isPayable &&
+                    mood === "admin" && (
+                      <div className="modal-actions">
+                        <button
+                          className="table-btn"
+                          onClick={() => {
+                            setPayCategory(i.payBucket);
+                            setSelectedExpense(selectedExpense);
+                            setFormData({});
+                            setNoteImage(null);
+                            setOpen(true);
+                          }}
+                        >
+                          Pay {CATEGORY_DISPLAY_LABELS[i.payBucket] || i.payBucket}
+                        </button>
+                      </div>
+                    )
+                  )}
 
-          <p>
-            <strong>Referral :</strong>
-            {selectedExpense?.user?.referralId}
-          </p>
+                  {!i.isPayable && i.status !== "paid" && (
+                    <p style={{ fontSize: "0.85rem", color: "#777" }}>
+                      Included in the {CATEGORY_DISPLAY_LABELS[i.payBucket] || i.payBucket} payment above.
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {activeTab === "summary" && (
+            <div className="report-view-box-right active">
+              <p>
+                <strong>Associate :</strong>
+                {selectedExpense?.user?.name}
+              </p>
 
-          <p>
-            <strong>Cycle :</strong>
-            {formatDate(selectedExpense?.cycleStart)}
-            {" - "}
-            {formatDate(selectedExpense?.cycleEnd)}
-          </p>
+              <p>
+                <strong>Referral :</strong>
+                {selectedExpense?.user?.referralId}
+              </p>
 
-          <p>
-            <strong>Gross :</strong>₹
-            {formatCurrency(selectedExpense?.grossAmount)}
-          </p>
+              <p>
+                <strong>Cycle :</strong>
+                {formatDate(selectedExpense?.cycleStart)}
+                {" - "}
+                {formatDate(selectedExpense?.cycleEnd)}
+              </p>
 
-          <p>
-            <strong>TDS :</strong>₹{formatCurrency(selectedExpense?.tdsAmount)}
-          </p>
+              <p>
+                <strong>Gross :</strong>₹
+                {formatCurrency(selectedExpense?.grossAmount)}
+              </p>
 
-          <p>
-            <strong>Admin Charge :</strong>₹
-            {formatCurrency(selectedExpense?.adminChargeAmount)}
-          </p>
+              <p>
+                <strong>TDS ({selectedExpense?.tdsPercent}%) :</strong>₹
+                {formatCurrency(selectedExpense?.tdsAmount)}
+              </p>
 
-          <p>
-            <strong>Net :</strong>₹{formatCurrency(selectedExpense?.netAmount)}
-          </p>
+              <p>
+                <strong>
+                  Admin Charge ({selectedExpense?.adminChargePercent}%) :
+                </strong>
+                ₹{formatCurrency(selectedExpense?.adminChargeAmount)}
+              </p>
 
-          <p>
-            <strong>Paid :</strong>₹{formatCurrency(selectedExpense?.totalPaid)}
-          </p>
+              <p>
+                <strong>Net :</strong>₹
+                {formatCurrency(selectedExpense?.netAmount)}
+              </p>
 
-          <p>
-            <strong>Remaining :</strong>₹
-            {formatCurrency(selectedExpense?.balance)}
-          </p>
-
-          <p>
-            <strong>Status :</strong>
-
-            <span className={`status ${selectedExpense?.status}`}>
-              {selectedExpense?.status}
-            </span>
-          </p>
-          <h4>Payment History</h4>
-
-          {selectedExpense?.payments?.length ? (
-            selectedExpense?.payments.map((payment, index) => (
-              <div className="history-card" key={index}>
+              <p>
+                <strong>Status :</strong>
+                <span
+                  style={{ textTransform: "capitalize" }}
+                  className={`status ${selectedExpense?.status === "paid"
+                    ? "active"
+                    : selectedExpense?.status === "released"
+                      ? "pending"
+                      : "failed"
+                    }`}
+                >
+                  {selectedExpense?.status}
+                </span>
+              </p>
+              {selectedExpense?.status === "paid" && (
                 <p>
-                  <strong>Amount :</strong>₹{formatCurrency(payment.amount)}
+                  <strong>Paid At :</strong>
+                  {formatDate(selectedExpense?.paidAt)}
                 </p>
+              )}
 
+              {selectedExpense?.paymentMode && (
                 <p>
-                  <strong>Mode :</strong>
-                  {payment.paymentMode}
+                  <strong>Payment Mode :</strong>
+                  {selectedExpense?.paymentMode}
                 </p>
-
+              )}
+              {selectedExpense?.transactionId && (
                 <p>
-                  <strong>Transaction :</strong>
-                  {payment.transactionId || "-"}
+                  <strong>Transaction Id :</strong>
+                  {selectedExpense?.transactionId}
                 </p>
-
+              )}
+              {selectedExpense?.attachment && (
                 <p>
-                  <strong>Date :</strong>
-                  {formatDate(payment.paidAt)}
+                  {/* <strong>Attachment :</strong> */}
+                  <img
+                    src={selectedExpense?.attachment}
+                    className="note-preview"
+                    alt=""
+                    onClick={() =>
+                      setImageModal({
+                        open: true,
+                        src: selectedExpense?.attachment,
+                      })
+                    }
+                  />
                 </p>
+              )}
+            </div>
+          )}
+          {activeTab === "history" && (
+            <div className="report-view-box-right active">
+              {detailLoading ? (
+                <p>Loading...</p>
+              ) : expenseDetail?.historyCount ? (
+                <>
+                  {(expenseDetail.histories || []).map((h) => (
+                    <div className="history-card" key={h._id}>
+                      <h5>
+                        <strong>
+                          {INCOME_TYPE_LABELS[h.type] || h.type} :
+                        </strong>
+                        ₹{formatCurrency(h.amount)}
+                      </h5>
 
-                {payment.attachment && (
-                  <img src={payment.attachment} alt="" width={180} />
-                )}
-              </div>
-            ))
-          ) : (
-            <p>No payment history</p>
+                      {h.businessAmount ? (
+                        <p>
+                          <strong>Business :</strong>₹
+                          {formatCurrency(h.businessAmount)}
+                          {h.percentage ? ` (${h.percentage}%)` : ""}
+                        </p>
+                      ) : null}
+
+                      {h.fromUser?.name ? (
+                        <p>
+                          <strong>From :</strong>
+                          {h.fromUser.name}
+                          {h.fromUser.referralId
+                            ? ` (${h.fromUser.referralId})`
+                            : ""}
+                        </p>
+                      ) : null}
+
+                      <p>
+                        <strong>Status :</strong>
+                        <span
+                          style={{ textTransform: "capitalize" }}
+                          className={`status ${h.status === "credited" ? "active" : "pending"
+                            }`}
+                        >
+                          {h.status}
+                        </span>
+                      </p>
+
+                      <p>
+                        <strong>Date :</strong>
+                        {formatDate(h.createdAt)}
+                      </p>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <p>No income entries found for this payout</p>
+              )}
+            </div>
           )}
         </ViewModal>
+
         <AddLocationModal
           open={open}
           onClose={() => {
             setOpen(false);
-
-            setFormData({
-              amount: "",
-              paymentMode: "",
-              transactionId: "",
-              chequeNumber: "",
-              bankName: "",
-              attachment: "",
-              remarks: "",
-            });
+            setPayCategory(null);
           }}
           title="Pay Associate"
         >
           {selectedExpense && (
             <>
-              <div className="summary-card">
-                <h4>{selectedExpense.user?.name}</h4>
+              {(() => {
+                const categoryEntry = payCategory
+                  ? expenseDetail?.categoryBreakdown?.find(
+                    (c) => c.category === payCategory,
+                  )
+                  : null;
 
-                <p>
-                  <strong>Referral :</strong> {selectedExpense.user?.referralId}
-                </p>
+                const displayNet = categoryEntry
+                  ? categoryEntry.netAmount
+                  : selectedExpense.netAmount;
+                const displayGross = categoryEntry
+                  ? categoryEntry.grossAmount
+                  : selectedExpense.grossAmount;
+                const displayTds = categoryEntry
+                  ? categoryEntry.tdsAmount
+                  : selectedExpense.tdsAmount;
+                const displayAdmin = categoryEntry
+                  ? categoryEntry.adminChargeAmount
+                  : selectedExpense.adminChargeAmount;
 
-                <p>
-                  <strong>Cycle :</strong>{" "}
-                  {formatDate(selectedExpense.cycleStart)} -{" "}
-                  {formatDate(selectedExpense.cycleEnd)}
-                </p>
+                return (
+                  <div className="summary-card">
+                    <h4>{selectedExpense.user?.name}</h4>
+                    <p>
+                      <strong>Referral :</strong> {selectedExpense.user?.referralId}
+                    </p>
+                    <p>
+                      <strong>Cycle :</strong>{" "}
+                      {formatDate(selectedExpense.cycleStart)} -{" "}
+                      {formatDate(selectedExpense.cycleEnd)}
+                    </p>
+                    <p>
+                      <strong>Gross Amount :</strong> ₹{formatCurrency(displayGross)}
+                    </p>
+                    <p>
+                      <strong>TDS :</strong> ₹{formatCurrency(displayTds)}
+                    </p>
+                    <p>
+                      <strong>Admin Charge :</strong> ₹{formatCurrency(displayAdmin)}
+                    </p>
+                    <p style={{ color: "green", fontWeight: 600 }}>
+                      <strong>Net Amount to pay :</strong> ₹{formatCurrency(displayNet)}
+                    </p>
+                  </div>
+                );
+              })()}
 
-                <p>
-                  <strong>Net Amount :</strong> ₹
-                  {formatCurrency(selectedExpense.netAmount)}
-                </p>
+              <p>
+                This will mark the {payCategory ? `${CATEGORY_DISPLAY_LABELS[payCategory] || payCategory} portion` : "selected category"} as paid and cannot be undone.
+              </p>
 
-                <p>
-                  <strong>Already Paid :</strong> ₹
-                  {formatCurrency(selectedExpense.totalPaid)}
-                </p>
-
-                <p style={{ color: "green", fontWeight: 600 }}>
-                  <strong>Remaining :</strong> ₹
-                  {formatCurrency(selectedExpense.balance)}
-                </p>
-              </div>
+              <h4>Payment</h4>
 
               <div className="field">
-                <label>Amount</label>
-
-                <input
-                  type="number"
-                  max={selectedExpense.balance}
-                  value={formData.amount}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      amount: e.target.value,
-                    })
-                  }
-                />
-
-                <small>
-                  Maximum Payable : ₹{formatCurrency(selectedExpense.balance)}
-                </small>
+                <label>Category</label>
+                <select
+                  value={payCategory || ""}
+                  onChange={(e) => setPayCategory(e.target.value)}
+                >
+                  <option value="">Select Category</option>
+                  {(expenseDetail?.categoryBreakdown || [])
+                    .filter((c) => c.grossAmount > 0)
+                    .map((c) => (
+                      <option
+                        key={c.category}
+                        value={c.category}
+                        disabled={c.status === "paid"}
+                      >
+                        {CATEGORY_DISPLAY_LABELS[c.category] || c.category}
+                        {c.status === "paid" ? " (Paid)" : ""}
+                      </option>
+                    ))}
+                </select>
               </div>
 
               <div className="field">
                 <label>Payment Mode</label>
-
                 <select
-                  value={formData.paymentMode}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      paymentMode: e.target.value,
-                    })
-                  }
+                  value={formData.mode}
+                  onChange={(e) => setFormData({ ...formData, mode: e.target.value })}
                 >
-                  <option value="">Select</option>
+                  <option value="">Select Mode</option>
                   <option value="cash">Cash</option>
                   <option value="upi">UPI</option>
-                  <option value="bank">Bank Transfer</option>
                   <option value="cheque">Cheque</option>
+                  <option value="bank">Bank Transfer</option>
                 </select>
               </div>
 
-              {(formData.paymentMode === "upi" ||
-                formData.paymentMode === "bank") && (
-                <>
-                  <div className="field">
-                    <label>Transaction ID</label>
-
-                    <input
-                      value={formData.transactionId}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          transactionId: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label>Bank Name</label>
-
-                    <input
-                      value={formData.bankName}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bankName: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </>
-              )}
-
-              {formData.paymentMode === "cheque" && (
-                <>
-                  <div className="field">
-                    <label>Cheque Number</label>
-
-                    <input
-                      value={formData.chequeNumber}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          chequeNumber: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label>Bank Name</label>
-
-                    <input
-                      value={formData.bankName}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bankName: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="field">
-                <label>Attachment</label>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileUpload("attachment", e.target.files[0])}
-                />
-
-                {formData.attachment && (
-                  <img
-                    src={
-                      formData.attachment instanceof File
-                        ? URL.createObjectURL(formData.attachment)
-                        : formData.attachment
+              {(formData.mode === "upi" || formData.mode === "bank") && (
+                <div className="field">
+                  <label>Transaction ID *</label>
+                  <input
+                    placeholder="Enter Transaction ID"
+                    value={formData.transactionId || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, transactionId: e.target.value })
                     }
-                    alt=""
-                    style={{
-                      width: 120,
-                      borderRadius: 8,
-                      marginTop: 10,
-                    }}
                   />
-                )}
-              </div>
+                </div>
+              )}
 
-              <div className="field">
-                <label>Remarks</label>
-
-                <textarea
-                  rows={3}
-                  value={formData.remarks}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      remarks: e.target.value,
-                    })
-                  }
-                />
-              </div>
+              {["upi", "cash", "cheque", "bank"].includes(formData.mode) && (
+                <div className="field">
+                  <label>Attachment *</label>
+                  <input
+                    id="site-note-image"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setNoteImage(e.target.files[0])}
+                  />
+                </div>
+              )}
 
               <div className="modal-actions">
                 <button
-                  disabled={saving || !formData.amount || !formData.paymentMode}
+                  disabled={saving || !payCategory || !formData.mode}
                   onClick={handlePay}
                 >
-                  {saving ? "Processing..." : "Pay Now"}
+                  {saving ? "Processing..." : "Confirm Payout"}
                 </button>
               </div>
             </>
           )}
+        </AddLocationModal>
+        <AddLocationModal
+          open={imageModal.open}
+          onClose={() =>
+            setImageModal({
+              open: false,
+              src: "",
+            })
+          }
+          title="Image Preview"
+        >
+          <div className="image-preview-modal">
+            <img
+              src={imageModal.src}
+              alt="Preview"
+              className="image-preview-full"
+            />
+          </div>
+        </AddLocationModal>
+        <AddLocationModal
+          open={exportOpen}
+          onClose={() => setExportOpen(false)}
+          title="Export User"
+        >
+          {/* <div className="export-modal"> */}
+          <div className="export-modal-body">
+            <p>Select which cycle you want to export</p>
+
+            <label>Payouts in selection: {getExportUsers().length}</label>
+
+            <select
+              value={exportCycle}
+              onChange={(e) => setExportCycle(e.target.value)}
+            >
+              <option value="">All Cycles</option>
+              {cycles.map((cycle) => (
+                <option key={cycle.value} value={cycle.value}>
+                  {cycle.label}
+                </option>
+              ))}
+            </select>
+
+            <div className="export-fields">
+              <p>Export includes:</p>
+              <span>Name</span>
+              <span>Phone</span>
+              <span>Email</span>
+              <span>UserID</span>
+              <span>Cycle</span>
+              <span>Gross</span>
+              <span>TDS</span>
+              <span>Admin Charge</span>
+              <span>Net</span>
+              <span>Status</span>
+              <span>Payment Mode</span>
+              <span>Transaction Id</span>
+            </div>
+          </div>
+
+          <div className="modal-actions" style={{ marginTop: "1rem" }}>
+            <button
+              type="button"
+              className="export-excel-btn"
+              onClick={exportToExcel}
+            >
+              <FileSpreadsheet size={18} />
+              Excel
+            </button>
+
+            <button
+              type="button"
+              className="export-pdf-btn"
+              onClick={exportToPDF}
+            >
+              <FileText size={18} />
+              PDF
+            </button>
+
+          </div>
+
+          {/* </div> */}
         </AddLocationModal>
       </div>
     </div>

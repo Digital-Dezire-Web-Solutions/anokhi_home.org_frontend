@@ -41,6 +41,16 @@ export const getUser = createAsyncThunk("app/getUser", async () => {
   });
   return res.json();
 });
+export const getCustomers = createAsyncThunk("app/customers", async () => {
+  const res = await fetch(`${Host}/api/auth/my-connected-users`, {
+    headers: {
+      "Content-Type": "application/json",
+      "auth-token": getToken(),
+    },
+  });
+  return res.json();
+});
+
 export const getUserById = createAsyncThunk("app/getUserById", async (id) => {
   const res = await fetch(`${Host}/api/auth/user/${id}`, {
     headers: {
@@ -1002,6 +1012,9 @@ const appSlice = createSlice({
       // All USER
       .addCase(getUser.fulfilled, (state, action) => {
         state.users = action.payload;
+      })
+      .addCase(getCustomers.fulfilled, (state, action) => {
+        state.customers = action.payload;
       })
       .addCase(getRank.fulfilled, (state, action) => {
         state.rankData = action.payload;
