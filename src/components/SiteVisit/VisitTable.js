@@ -17,6 +17,7 @@ import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
 import Host from "../../Host/Host";
 import SiteVisitTable from "../Tables/SiteVisitTable";
+import Pagination from "../Pagination/Pagination";
 // import "./SiteVisit.css";
 
 const ITEMS_PER_PAGE = 50;
@@ -162,6 +163,7 @@ const VisitTable = ({ data, mood, setAlert, landingPage }) => {
   const [selectedProjects, setSelectedProjects] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
   const [selectedPlot, setSelectedPlot] = useState(null);
+  
 
   // console.log(selectedCustomer, "selected");
   // console.log(selectedProjects, "selectedProjects");
@@ -264,28 +266,7 @@ const VisitTable = ({ data, mood, setAlert, landingPage }) => {
         </div>
       </div>
      
-      <div className="pagination">
-        <button disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-          Prev
-        </button>
-
-        {Array.from({ length: totalPages }).map((_, i) => (
-          <button
-            key={i}
-            className={page === i + 1 ? "active" : ""}
-            onClick={() => setPage(i + 1)}
-          >
-            {i + 1}
-          </button>
-        ))}
-
-        <button
-          disabled={page === totalPages}
-          onClick={() => setPage(page + 1)}
-        >
-          Next
-        </button>
-      </div>
+      <Pagination page={page} totalPages={totalPages} setPage={setPage} />
       <AddLocationModal
         open={open}
         onClose={() => setOpen(false)}

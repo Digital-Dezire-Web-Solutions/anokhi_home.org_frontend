@@ -23,6 +23,7 @@ import Host from "../../Host/Host";
 import { formatCurrency } from "../../components/Utils/FormatCurrency";
 import AddBookingForm from "../../components/UserForm/AddBookingForm";
 import BookingTable from "../../components/Tables/BookingTable";
+import Pagination from "../../components/Pagination/Pagination";
 const ITEMS_PER_PAGE = 12;
 
 const Booking = ({ mood, setAlert, landingPage }) => {
@@ -285,7 +286,6 @@ const Booking = ({ mood, setAlert, landingPage }) => {
               <p>No Bookings Found</p>
             ) : (
               booking
-                ?.slice(0, 5)
                 ?.map((item, index) => (
                   <BookingTable
                     index={index}
@@ -320,7 +320,7 @@ const Booking = ({ mood, setAlert, landingPage }) => {
         )}
       </div> */}
       {/* Pagination */}
-      {totalPages > 1 && (
+      {/* {totalPages > 1 && (
         <div className="pagination">
           <button
             disabled={currentPage === 1}
@@ -346,7 +346,8 @@ const Booking = ({ mood, setAlert, landingPage }) => {
             Next
           </button>
         </div>
-      )}
+      )} */}
+      <Pagination page={currentPage} totalPages={totalPages} setPage={setCurrentPage} />
       <AddLocationModal
         open={open}
         onClose={() => setOpen(false)}

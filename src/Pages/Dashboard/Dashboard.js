@@ -24,6 +24,7 @@ import NiBooking from "../../icons/ni-booking";
 import NiPayments from "../../icons/ni-payments";
 import { FaAngleRight } from "react-icons/fa";
 import TopPerformer from "../../components/Tables/TopPerformer";
+import TodayEventModal from "./Todayeventmodal";
 
 const Dashboard = ({ setAlert, mood, data }) => {
   const dispatch = useDispatch();
@@ -266,6 +267,7 @@ const Dashboard = ({ setAlert, mood, data }) => {
               </div>
             </div>
           </div>
+          <TodayEventModal userId={userDetail?._id} />
         </div>
       </div>
       <AddLocationModal

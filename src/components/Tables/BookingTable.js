@@ -15,6 +15,8 @@ import { getBooking, getRating } from "../../Redux/Slices/AppSlices";
 import NiSitevisit from "../../icons/ni-sitevisit";
 import { formatCurrency } from "../Utils/FormatCurrency";
 import NiStar from "../../icons/ni-star";
+import PaymentAmountModal from "../Modals/Paymentamountmodal";
+import { uploadImage } from "../../Pages/LandingSetting/LandingApi";
 
 const BookingTable = ({
   index,
@@ -42,6 +44,7 @@ const BookingTable = ({
   const [panelMode, setPanelMode] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
 
   useEffect(() => {
     if (!viewOpen) {
@@ -272,79 +275,48 @@ const BookingTable = ({
   };
 
   // Add Payment
-  const handleAddPayment = async () => {
+  const handleAddPayment = async (data) => {
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
 
-      // 🔥 validations
-      if (!formData.paymentType) {
-        return;
-        setAlert({ message: "Select payment type", status: "Error" });
-        setTimeout(() => setAlert(null), 3000);
+      let attachment = "";
+      if (data.attachment) {
+        const upload = await uploadImage(data.attachment);
+        attachment = upload.url;
       }
 
-      if (!formData.mode) {
-        return;
-        setAlert({ message: "Select payment mode", status: "Error" });
-        setTimeout(() => setAlert(null), 3000);
-      }
-
-      if (!formData.amount) {
-        return;
-        setAlert({ message: "Enter amount", status: "Error" });
-        setTimeout(() => setAlert(null), 3000);
-      }
-
-      if (
-        (formData.mode === "UPI" || formData.mode === "Bank Transfer") &&
-        !formData.transactionId
-      ) {
-        return setAlert({
-          message: "Transaction ID required",
-          status: "Error",
-        });
-        setTimeout(() => setAlert(null), 3000);
-      }
-
-      const payload = {
-        booking: item._id,
-        amount: Number(formData.amount),
-        paymentMode: formData.mode,
-        paymentType: formData.paymentType,
-        transactionId: formData.transactionId || "",
-      };
-
-      await axios.post(`${Host}/api/payment/add`, payload, {
-        headers: {
-          "auth-token": token,
-          "Content-Type": "application/json",
+      await axios.post(
+        `${Host}/api/payment/add`,
+        {
+          booking: item._id,
+          amount: data.amount,
+          paymentMode: data.mode,
+          paymentType: data.paymentType,
+          transactionId: data.transactionId,
+          attachment,
         },
-      });
-
-      // console.log(payload, "payload")
+        {
+          headers: { "auth-token": token, "Content-Type": "application/json" },
+        },
+      );
 
       setAlert({
         message: "Payment submitted successfully",
         status: "Success",
       });
-
       dispatch(getBooking());
-
-      setFormData({});
-      setPanelMode(null);
+      setPayOpen(false);
       setViewOpen(false);
-
-      setTimeout(() => setAlert(null), 3000);
-      setSaving(false);
     } catch (err) {
       console.error(err);
       setAlert({
         message: err.response?.data?.message || "Payment failed",
         status: "Error",
       });
-      setTimeout(() => setAlert(null), 3000);
+    } finally {
       setSaving(false);
+      setTimeout(() => setAlert(null), 3000);
     }
   };
 
@@ -413,6 +385,12 @@ const BookingTable = ({
   // console.log(paymentSummary, "paymentSummary");
   // console.log(bookingPaid, "bookingPaid")
   console.log(saving, "saving");
+  const plcPercent = Number(item.plcPercent || 0);
+  const plcAmount = Number(item.plcAmount || 0);
+  const hasPlc = plcPercent > 0 && plcAmount > 0;
+  const plcPending = !!item.plot?.plc && !hasPlc; // PLC plot, admin hasn't set % yet
+  const baseAmount = total - plcAmount; // amount before PLC
+
   return (
     <>
       <div>
@@ -436,11 +414,12 @@ const BookingTable = ({
                 <div class="modal-actions">
                   <button
                     className="view-report-btn"
-                    onClick={() => {
-                      setViewOpen(true);
-                      setPanelMode("payment");
-                      setShowReport(false);
-                    }}
+                    // onClick={() => {
+                    //   setViewOpen(true);
+                    //   setPanelMode("payment");
+                    //   setShowReport(false);
+                    // }}
+                    onClick={() => setPayOpen(true)}
                   >
                     Add Payment
                   </button>
@@ -688,28 +667,17 @@ const BookingTable = ({
           <div className="user-card-bottom-left">
             <p>Date</p>
             <p>Plot</p>
+            {hasPlc && (
+              <>
+                <p>Base Amount</p>
+                <p>PLC %</p>
+                <p>PLC Amount</p>
+              </>
+            )}
+            {plcPending && <p>PLC</p>}
             <p>Total</p>
             <p>Paid</p>
             <p>Remaining</p>
-
-            {/* {item.status === "confirmed" ||
-              (item.status === "pending" && (
-                <>
-                  <div className="table-filters">
-                    <button
-                      className={`view-report-btn ${showReport ? "active" : ""}`}
-                      onClick={() => {
-                        setPanelMode("report");
-                        setShowReport(true);
-                        setShowTimeline(false);
-
-                      }}
-                    >
-                      <NiReport /> Report
-                    </button>
-                  </div>
-                </>
-              ))} */}
           </div>
 
           <div className="user-card-bottom-right">
@@ -718,33 +686,22 @@ const BookingTable = ({
               {item?.plot?.plotNumber}, {item?.colony?.name},{" "}
               {item?.location?.name}
             </p>
+            {hasPlc && (
+              <>
+                <p>₹{formatCurrency(baseAmount)}</p>
+                <p>{plcPercent}%</p>
+                <p>₹{formatCurrency(plcAmount)}</p>
+              </>
+            )}
+            {plcPending && <p>Pending approval</p>}
             <p>₹{formatCurrency(item?.finalAmount)}</p>
             <p>₹{formatCurrency(paid)}</p>
             <p>₹{formatCurrency(remaining)}</p>
-
-            {/* {item.status === "confirmed" ||
-              (item.status === "pending" && (
-                <>
-
-                  <div className="table-filters">
-                    <button
-                      className={`view-report-btn ${showTimeline ? "active" : ""}`}
-                      onClick={() => {
-                        setPanelMode("timeline");
-                        setShowReport(false);
-                        setShowTimeline(true);
-                      }}
-                    >
-                      <NiSitevisit /> Timeline
-                    </button>
-                  </div>
-                </>
-              ))} */}
           </div>
         </div>
-        {item.status === "confirmed" ||
+        {/* {item.status === "confirmed" ||
           (item.status === "pending" && (
-            <>
+            <> */}
               <div class="modal-actions">
                 <button
                   className={`view-report-btn ${showReport ? "active" : ""}`}
@@ -768,8 +725,8 @@ const BookingTable = ({
                   <NiSitevisit /> Timeline
                 </button>
               </div>
-            </>
-          ))}
+            {/* </>
+          ))} */}
         {item.status === "pending" &&
           mood !== "user" &&
           panelMode !== "payment" && (
@@ -780,6 +737,7 @@ const BookingTable = ({
                   setPanelMode("payment");
                   setShowReport(false);
                 }}
+                // onClick={() => setPayOpen(true)}
               >
                 Add Payment
               </button>
@@ -850,7 +808,7 @@ const BookingTable = ({
                     let autoAmount = "";
 
                     if (type === "booking") autoAmount = total * 0.1;
-                    if (type === "agreement") autoAmount = total * 0.25;
+                    if (type === "agreement") autoAmount = total * 0.20;
                     if (type === "full") autoAmount = total;
 
                     setFormData({
@@ -915,7 +873,11 @@ const BookingTable = ({
               )}
               <p>Notes : 35% cancellation charges</p>
               <div className="modal-actions">
-                <button disabled={saving} onClick={handleAddPayment}>
+                <button
+                  disabled={saving}
+                  onClick={handleAddPayment}
+                  // onClick={() => setPayOpen(true)}
+                >
                   Add Payment
                 </button>
               </div>
@@ -1009,7 +971,7 @@ const BookingTable = ({
 
                 {/* AGREEMENT */}
 
-                {bookingPaid && (
+                {/* {bookingPaid && ( */}
                   <div
                     className={`installment ${agreementPaid ? "paid" : "pending"}`}
                   >
@@ -1019,8 +981,8 @@ const BookingTable = ({
                       {agreementPaid ? "paid" : "pending"})
                     </span>
                   </div>
-                )}
-                {bookingPaid && (
+                {/* )} */}
+                {/* {bookingPaid && ( */}
                   <div
                     className={`installment ${agreementPaid ? "paid" : "pending"}`}
                   >
@@ -1034,11 +996,11 @@ const BookingTable = ({
                           )} days remaining`}
                     </span>
                   </div>
-                )}
+                {/* )} */}
 
                 {/* FULL */}
 
-                {bookingPaid && (
+                {/* {bookingPaid && ( */}
                   <div
                     className={`installment ${fullPaid ? "paid" : "pending"}`}
                   >
@@ -1048,8 +1010,8 @@ const BookingTable = ({
                       {fullPaid ? "paid" : "pending"})
                     </span>
                   </div>
-                )}
-                {bookingPaid && (
+                {/* )} */}
+                {/* {bookingPaid && ( */}
                   <div
                     className={`installment ${fullPaid ? "paid" : "pending"}`}
                   >
@@ -1064,7 +1026,7 @@ const BookingTable = ({
                           )} days remaining`}
                     </span>
                   </div>
-                )}
+                {/* )} */}
               </div>
 
               {/* NOTE */}
@@ -1148,6 +1110,22 @@ const BookingTable = ({
           )}
         </div>
       </ViewModal>
+      <PaymentAmountModal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        customerName={item?.customer?.name}
+        plotLabel={`${item?.plot?.plotNumber}, ${item?.colony?.name}`}
+        total={total}
+        remaining={remaining}
+        stage={currentStage}
+        schedule={{
+          booking: bookingAmount,
+          agreement: agreementAmount,
+          full: fullAmount,
+        }}
+        saving={saving}
+        onSubmit={handleAddPayment}
+      />
     </>
   );
 };

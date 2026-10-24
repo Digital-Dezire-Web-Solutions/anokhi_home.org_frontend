@@ -1,16 +1,39 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import "./Commission.css";
-import Breadcrumb from "../../components/Breadcrumb/Breadcrumb";
 import NiSearch from "../../icons/ni-search";
-import NiExport from "../../icons/ni-export";
-import ViewModal from "../../components/Modals/ViewModal";
 import CommissionTable from "../../components/Cards/CommissionTable";
 
 import { useDispatch, useSelector } from "react-redux";
 import { getIncomeSummary } from "../../Redux/Slices/AppSlices";
+import Pagination from "../../components/Pagination/Pagination";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import AddLocationModal from "../../components/Modals/AddLocationModal";
 
-const ITEMS_PER_PAGE = 15;
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import logo from "../../Assets/Logo/logo-anokhi-home-green.png";
+
+const ITEMS_PER_PAGE = 30;
+
+const EXPORT_COLUMNS = [
+  "S.No",
+  "Name",
+  "Designation",
+  "Referral ID",
+  "Referral Income",
+  "Direct Income",
+  "Diff. Income",
+  "Matching Income",
+  "Royalty Income",
+  "Cashback Income",
+  "Best Performer",
+  "Total Commission",
+  "TDS",
+  "Admin Charge",
+  "Payout Amount",
+];
 
 const Commission = ({ mood, setAlert }) => {
   const dispatch = useDispatch();
@@ -26,25 +49,12 @@ const Commission = ({ mood, setAlert }) => {
     dispatch(getIncomeSummary());
   }, []);
 
-  // GET /commission/summary returns a flat array of per-agent
-  // objects: root User fields spread, plus incomeSummary,
-  // businessSummary, rankSummary, rewardSummary, payoutSummary,
-  // walletSummary, ratingSummary, histories, payouts, cycleStart,
-  // cycleEnd, cycleDate (next pending cycleDate, may be null).
   const commissionData = incomeSummary || [];
-
-  const formatCycleDate = (date) => {
-    if (!date) return "-";
-
-    return new Date(date).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "2-digit",
-    });
-  };
 
   const filteredData = useMemo(() => {
     return commissionData.filter((item) => {
+      const matchPayable = Number(item?.incomeSummary?.payableAmount || 0) > 0;
+
       const searchText = search.toLowerCase();
 
       const matchSearch =
@@ -62,7 +72,7 @@ const Commission = ({ mood, setAlert }) => {
         (statusFilter === "credited" &&
           (item.incomeSummary?.creditedCommission || 0) > 0);
 
-      return matchSearch && matchCycle && matchStatus;
+      return matchPayable && matchSearch && matchCycle && matchStatus;
     });
   }, [commissionData, search, cycleFilter, statusFilter]);
 
@@ -73,65 +83,151 @@ const Commission = ({ mood, setAlert }) => {
     page * ITEMS_PER_PAGE,
   );
 
-  // Exports exactly what the table shows — one row per agent, the
-  // same income/payout columns visible in CommissionTable. The old
-  // version exported item.user.*, item.type, item.businessAmount,
-  // item.amount — those fields don't exist on this response shape
-  // (that shape belongs to a single IncomeHistory row, not the
-  // per-agent summary object this page actually receives).
-  const exportToExcel = (rowsData = filteredData) => {
-    setSaving(true);
+  /* =====================================================
+     BUILD EXPORT ROWS — directly from the filtered
+     commission list, no per-user selection step
+  ===================================================== */
 
-    const headers = [
-      "Agent",
-      "Phone",
-      "Referral ID",
-      "Designation",
-      "Direct Income",
-      "Diff. Income",
-      "Matching Income",
-      "Royalty Income",
-      "Cashback Income",
-      "Best Performer",
-      "Total Commission",
-      "TDS",
-      "Admin Charge",
-      "Payout Amount",
-      "Hold (payouts)",
-      "Next Cycle Date",
-    ];
+  const fmt2 = (n) => (Number(n) || 0).toFixed(2);
 
-    const rows = rowsData.map((item) => [
-      item?.name,
-      item?.phone,
-      item?.referralId,
-      item?.designation,
-      item?.incomeSummary?.directIncome,
-      item?.incomeSummary?.differenceIncome,
-      item?.incomeSummary?.matchingIncome,
-      item?.incomeSummary?.royaltyIncome,
-      item?.incomeSummary?.cashbackIncome,
-      item?.incomeSummary?.bestPerformanceIncome,
-      item?.incomeSummary?.totalCommission,
-      item?.incomeSummary?.tdsAmount,
-      item?.incomeSummary?.adminChargeAmount,
-      item?.incomeSummary?.payableAmount,
-      item?.payoutSummary?.holdCommission,
-      formatCycleDate(item?.cycleDate),
-    ]);
+  const getExportRows = () => {
+    return filteredData.map((item, index) => ({
+      "S.No": index + 1,
+      Name: item?.name || "-",
+      Designation: item?.designation || "-",
+      "Referral ID": item?.referralId || "-",
+      "Referral Income": fmt2(item?.incomeSummary?.referralIncome) || 0,
+      "Direct Income": fmt2(item?.incomeSummary?.directIncome) || 0,
+      "Diff. Income": fmt2(item?.incomeSummary?.differenceIncome) || 0,
+      "Matching Income": fmt2(item?.incomeSummary?.matchingIncome) || 0,
+      "Royalty Income": fmt2(item?.incomeSummary?.royaltyIncome) || 0,
+      "Cashback Income": fmt2(item?.incomeSummary?.cashbackIncome) || 0,
+      "Best Performer": fmt2(item?.incomeSummary?.bestPerformanceIncome) || 0,
+      "Total Commission": fmt2(item?.incomeSummary?.totalCommission) || 0,
+      TDS: fmt2(item?.incomeSummary?.tdsAmount) || 0,
+      "Admin Charge": fmt2(item?.incomeSummary?.adminChargeAmount) || 0,
+      "Payout Amount": fmt2(item?.incomeSummary?.payableAmount) || 0,
+    }));
+  };
 
-    const csv =
-      "data:text/csv;charset=utf-8," +
-      [headers, ...rows].map((e) => e.join(",")).join("\n");
+  /* =====================================================
+     EXPORT EXCEL
+  ===================================================== */
+  const exportToExcel = () => {
+    const rows = getExportRows();
 
-    const link = document.createElement("a");
+    if (!rows.length) {
+      setAlert({ message: "No commission data to export", status: "Error" });
+      setTimeout(() => setAlert(null), 3000);
+      return;
+    }
 
-    link.href = encodeURI(csv);
+    const worksheet = XLSX.utils.json_to_sheet(rows);
 
-    link.download = "commission-report.csv";
+    const columnWidths = Object.keys(rows[0]).map((key) => {
+      const maxLength = Math.max(
+        key.length,
+        ...rows.map((row) => String(row[key] ?? "").length),
+      );
+      return { wch: Math.min(maxLength + 3, 40) };
+    });
 
-    link.click();
-    setSaving(false);
+    worksheet["!cols"] = columnWidths;
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Commission");
+
+    XLSX.writeFile(workbook, "commission-report.xlsx");
+
+    setAlert({ message: "Excel exported successfully", status: "Success" });
+    setTimeout(() => setAlert(null), 3000);
+    setExportOpen(false);
+  };
+
+  /* =====================================================
+     EXPORT PDF
+  ===================================================== */
+  const loadLogo = (src) =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        resolve({
+          data: canvas.toDataURL("image/png"),
+          ratio: img.naturalWidth / img.naturalHeight,
+        });
+      };
+      img.onerror = () => resolve(null); // export still works without the logo
+      img.src = src;
+    });
+  const exportToPDF = async () => {
+    const rows = getExportRows();
+
+    if (!rows.length) {
+      setAlert({ message: "No commission data to export", status: "Error" });
+      setTimeout(() => setAlert(null), 3000);
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const logoImg = await loadLogo(logo);
+    const LOGO_HEIGHT = 14; // mm
+    const RIGHT_MARGIN = 5; // matches this table's right margin
+
+    const drawLogo = () => {
+      if (!logoImg) return;
+      const w = LOGO_HEIGHT * logoImg.ratio; // keeps the aspect ratio
+      const x = doc.internal.pageSize.getWidth() - RIGHT_MARGIN - w;
+      doc.addImage(logoImg.data, "PNG", x, 6, w, LOGO_HEIGHT);
+    };
+    doc.setFontSize(18);
+    doc.text("Commission Report", 14, 15);
+
+    doc.setFontSize(9);
+    doc.text(`Total Records: ${rows.length}`, 14, 22);
+
+    const columns = Object.keys(rows[0]);
+    const body = rows.map((row) => columns.map((column) => row[column] ?? "-"));
+
+    autoTable(doc, {
+      head: [columns],
+      body,
+      startY: 27,
+      theme: "grid",
+      tableWidth: "auto", // let it fill the printable width, not exceed it
+      styles: {
+        fontSize: 6,
+        cellPadding: 1,
+        overflow: "linebreak",
+        valign: "middle",
+        halign: "left",
+        lineWidth: 0.1,
+      },
+      headStyles: { fontSize: 6, fontStyle: "bold", valign: "middle" },
+      bodyStyles: { valign: "middle" },
+      // let autoTable distribute width proportionally to content instead
+      // of hardcoded mm values that summed to more than the page
+      columnStyles: {
+        0: { cellWidth: 8 }, // S.No stays narrow
+      },
+      margin: { top: 27, left: 5, right: 5, bottom: 8 },
+      didDrawPage: drawLogo,
+    });
+
+    doc.save("commission-report.pdf");
+
+    setAlert({ message: "PDF exported successfully", status: "Success" });
+    setTimeout(() => setAlert(null), 3000);
+    setExportOpen(false);
   };
 
   return (
@@ -140,7 +236,6 @@ const Commission = ({ mood, setAlert }) => {
         <div className="page-tools">
           <div className="searchItem">
             <NiSearch />
-
             <input
               placeholder="Search Agent"
               value={search}
@@ -148,7 +243,7 @@ const Commission = ({ mood, setAlert }) => {
             />
           </div>
           <button className="add-button" onClick={() => setExportOpen(true)}>
-            <NiExport />
+            <Download size={18} />
             Export
           </button>
         </div>
@@ -157,6 +252,7 @@ const Commission = ({ mood, setAlert }) => {
       <div className="card table-box">
         <div className="table commission-table-box">
           <div className="table-head commission-table">
+            <span>S.No</span>
             <span>Name</span>
             <span>Designation</span>
             <span>Referral ID</span>
@@ -171,7 +267,6 @@ const Commission = ({ mood, setAlert }) => {
             <span>TDS</span>
             <span>Admin Charge</span>
             <span>Payout Amount</span>
-            <span>Hold</span>
             <span>Status</span>
             <span>Action</span>
           </div>
@@ -186,46 +281,52 @@ const Commission = ({ mood, setAlert }) => {
                 item={item}
                 mood={mood}
                 setAlert={setAlert}
+                page={page}
+                ITEMS_PER_PAGE={ITEMS_PER_PAGE}
               />
             ))
           )}
         </div>
       </div>
 
-      <div className="pagination">
-        <button disabled={page === 1} onClick={() => setPage(page - 1)}>
-          Prev
-        </button>
+      <Pagination page={page} totalPages={totalPages} setPage={setPage} />
 
-        {Array.from({
-          length: totalPages,
-        }).map((_, i) => (
-          <button
-            key={i}
-            className={page === i + 1 ? "active" : ""}
-            onClick={() => setPage(i + 1)}
-          >
-            {i + 1}
-          </button>
-        ))}
-
-        <button
-          disabled={page === totalPages}
-          onClick={() => setPage(page + 1)}
-        >
-          Next
-        </button>
-      </div>
-
-      <ViewModal
+      <AddLocationModal
         open={exportOpen}
         onClose={() => setExportOpen(false)}
-        title="Export Report"
+        title="Export Commission Report"
       >
-        <button disabled={saving} onClick={() => exportToExcel()}>
-          {saving ? "Exporting" : "Export Now"}
-        </button>
-      </ViewModal>
+        <div className="export-modal-body">
+          <div className="export-fields">
+            <p>Export includes:</p>
+            {EXPORT_COLUMNS.map((col) => (
+              <span key={col}>{col}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="modal-actions" style={{ marginTop: "1rem" }}>
+          <button
+            type="button"
+            className="export-excel-btn"
+            disabled={saving}
+            onClick={exportToExcel}
+          >
+            <FileSpreadsheet size={18} />
+            Excel
+          </button>
+
+          <button
+            type="button"
+            className="export-pdf-btn"
+            disabled={saving}
+            onClick={exportToPDF}
+          >
+            <FileText size={18} />
+            PDF
+          </button>
+        </div>
+      </AddLocationModal>
     </div>
   );
 };

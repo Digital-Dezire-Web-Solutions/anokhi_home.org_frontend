@@ -64,6 +64,7 @@ import { useDispatch } from "react-redux";
 import { formatCurrency } from "../Utils/FormatCurrency";
 import downloadReceipt from "../Utils/downloadReceipt";
 import NiReceipt from "../../icons/ni-receipt";
+import { printPaymentReceipt } from "../Utils/printPaymentReceipt";
 
 const PaymentsTable = ({
   item,
@@ -164,7 +165,15 @@ const PaymentsTable = ({
           {item.status}
         </span>
         <div className="dots">
-          <span onClick={() => downloadReceipt(item._id)}>
+          <span
+            role="button"
+            tabIndex={0}
+            title="Print receipt"
+            onClick={(e) => {
+              e.stopPropagation(); // card has its own onClick on the dashboard
+              printPaymentReceipt(item);
+            }}
+          >
             <NiReceipt />
           </span>
           <span

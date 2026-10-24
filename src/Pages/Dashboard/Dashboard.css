@@ -6,7 +6,7 @@
 }
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   /* margin-top: 20px; */
 }
@@ -166,6 +166,9 @@
 .dashboard-head {
   /* color: #9f9f9f; */
   border-bottom: .1px solid #bdbaad;
+}
+.dashboard-row span{
+  text-transform: capitalize;
 }
 .dashboard-head,
 .dashboard-row {

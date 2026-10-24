@@ -47,7 +47,7 @@ const SiteVisitTable = ({
     dispatch(getPaymentTerms());
     dispatch(getPlotsetting());
   }, []);
-
+  const PLC_OPTIONS = [5, 6, 7, 8, 9, 10];
   const [activeRow, setActiveRow] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
@@ -68,6 +68,8 @@ const SiteVisitTable = ({
   const [saving, setSaving] = useState(false);
   const [selectedColony, setSelectedColony] = useState(null);
   const [type, setType] = useState("FREE");
+  const isAdminOrStaff = mood !== "agent" && mood !== "user";
+  const showPlc = isAdminOrStaff && !!selectedPlot?.plc;
 
   useEffect(() => {
     if (selectedColony?._id) {
@@ -242,7 +244,6 @@ const SiteVisitTable = ({
   };
 
   const handleAddBooking = async () => {
-    setSaving(true);
     try {
       const token = localStorage.getItem("token");
 
@@ -266,7 +267,16 @@ const SiteVisitTable = ({
         setTimeout(() => setAlert(null), 3000);
         return;
       }
+      if (showPlc && !formData.plcPercent) {
+        setAlert({
+          message: "Please select PLC percentage",
+          status: "Error",
+        });
+        setTimeout(() => setAlert(null), 3000);
+        return;
+      }
 
+      setSaving(true);
       console.log(formData, "formData");
       const res = await axios.post(
         `${Host}/api/booking/add`,
@@ -274,11 +284,12 @@ const SiteVisitTable = ({
           sitevisitId: item._id, // 🔥 IMPORTANT
           customer: item.customer._id,
           location: item.location?._id,
-          agent:item.agent._id,
+          agent: item.agent._id,
           colony: selectedColony._id,
           plot: selectedPlot._id, // 🔥 IMPORTANT
 
           requestAmount: formData.requestAmount,
+          plcPercent: showPlc ? Number(formData.plcPercent) : undefined,
 
           bookingDays: formData.bookingDays,
           agreementDays: formData.agreementDays,
@@ -294,7 +305,7 @@ const SiteVisitTable = ({
         },
       );
 
-      console.log(res,"res")
+      console.log(res, "res");
       setAlert({
         message: "Booking created successfully",
         status: "Success",
@@ -312,7 +323,7 @@ const SiteVisitTable = ({
       setTimeout(() => setAlert(null), 3000);
     } catch (err) {
       console.error(err);
-      console.log(err,"err")
+      console.log(err, "err");
       setAlert({
         message: err.response?.data?.message || "Booking failed",
         status: "Error",
@@ -322,7 +333,7 @@ const SiteVisitTable = ({
     }
   };
 
-//   console.log(selectedPlot,"selectedPlot")
+  //   console.log(selectedPlot,"selectedPlot")
   const handleDeleteVisit = async (visitId) => {
     try {
       const token = localStorage.getItem("token");
@@ -353,49 +364,53 @@ const SiteVisitTable = ({
   };
 
   const handleHoldPlot = async () => {
+    if (!selectedColony || !selectedPlot) {
+      setAlert({ message: "Please select colony and plot", status: "Error" });
+      setTimeout(() => setAlert(null), 3000);
+      return;
+    }
+
     setSaving(true);
-    const token = localStorage.getItem("token");
-    await axios.post(
-      `${Host}/api/plothold/${type.toLowerCase()}`,
-      {
-        colony: selectedColony._id,
-        plotId: selectedPlot._id,
-        customer: item.customer._id,
-      },
-      {
-        headers: {
-          "auth-token": token,
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `${Host}/api/plothold/${type.toLowerCase()}`,
+        {
+          colony: selectedColony._id,
+          plotId: selectedPlot._id,
+          customer: item.customer._id,
         },
-      },
-    );
-    setAlert({
-      message: "Hold Request Submitted",
-      status: "Success",
-    });
-    dispatch(getSiteVisit());
+        { headers: { "auth-token": token } },
+      );
 
-    // reset UI
-    setViewOpen(false);
-    setSelectedPlot(null);
-    setFormData({});
-    setPanelMode(null);
+      setAlert({ message: "Hold Request Submitted", status: "Success" });
+      dispatch(getSiteVisit());
 
-    setTimeout(() => setAlert(null), 3000);
-    setSaving(false);
-    // setShowHoldModal(false);
-    // onClose();
+      setViewOpen(false);
+      setSelectedPlot(null);
+      setFormData({});
+      setPanelMode(null);
+    } catch (err) {
+      setAlert({
+        message: err.response?.data?.message || "Hold failed",
+        status: "Error",
+      });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setAlert(null), 3000);
+    }
   };
 
-//   console.log(item, "item");
+  //   console.log(item, "item");
   return (
     <div>
       <div className="table-row" key={item._id}>
-        <span>{index+1}</span>
+        <span>{index + 1}</span>
         <span>{formatDate(item.createdAt)}</span>
         <span>
           {item.customer.name} ({item.customer.phone})
         </span>
-        <span>{item.agent?.name || "-"}</span>
+        <span>{item.agent?.name || "-"} ({item.agent?.referralId || "-"})</span>
         <span>
           {((mood === "admin" && item.status === "scheduled") ||
             item.status === "rescheduled") && (
@@ -455,12 +470,12 @@ const SiteVisitTable = ({
                 setDeleteOpen(true);
               }}
               showEdit={false}
-                showDelete={true}
+              showDelete={true}
             />
           )}
         </div>
       </div>
-     
+
       <DeleteModal open={deleteOpen} onClose={() => setDeleteOpen(false)}>
         <p>Are you sure you want to delete?</p>
         <div className="modal-actions">
@@ -713,6 +728,7 @@ const SiteVisitTable = ({
                       ...prev,
                       colony: colony?._id || "",
                       plot: "",
+                      plcPercent: "",
                     }));
                   }}
                 >
@@ -745,6 +761,7 @@ const SiteVisitTable = ({
                       pricePerSqft: selected.price,
                       plotArea: selected.area,
                       priceRange: selected.priceRange,
+                      plcPercent: "",
                     });
                   }}
                   displayKey="plotNumber"
@@ -818,7 +835,41 @@ const SiteVisitTable = ({
                     />
                   </div>
                 )}
+              {showPlc && (
+                <div className="field">
+                  <label>
+                    PLC %{" "}
+                    <small style={{ fontSize: "12px", color: "green" }}>
+                      {formData.plcPercent && formData.requestAmount
+                        ? `+₹${formatCurrency(
+                            (Number(formData.requestAmount) *
+                              Number(formData.plotArea) *
+                              Number(formData.plcPercent)) /
+                              100,
+                          )}`
+                        : ""}
+                    </small>
+                    <span style={{ color: "red" }}>*</span>
+                  </label>
 
+                  <select
+                    value={formData.plcPercent || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        plcPercent: Number(e.target.value),
+                      })
+                    }
+                  >
+                    <option value="">Select PLC %</option>
+                    {PLC_OPTIONS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}%
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="field">
                 <label>Booking Payment Days</label>
 
@@ -960,7 +1011,7 @@ const SiteVisitTable = ({
                     handleAddBooking();
                   }}
                 >
-                  Submit 
+                  Submit
                 </button>
               </div>
             </>
@@ -985,6 +1036,7 @@ const SiteVisitTable = ({
                       ...prev,
                       colony: colony?._id || "",
                       plot: "",
+                      plcPercent: "",
                     }));
                   }}
                 >

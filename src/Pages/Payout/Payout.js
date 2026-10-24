@@ -18,9 +18,14 @@ import axios from "axios";
 import AddLocationModal from "../../components/Modals/AddLocationModal";
 import { uploadImage } from "../LandingSetting/LandingApi";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import Pagination from "../../components/Pagination/Pagination";
+import logo from "../../Assets/Logo/logo-anokhi-home-green.png";
+import NiReceipt from "../../icons/ni-receipt";
+import { printPayoutStatement } from "../../components/Utils/printpayoutstatement";
+import CustomSelect from "../../components/CustomSelect/CustomSelect";
 
-const STATUS_OPTIONS = ["hold", "released", "paid", "cancelled"];
-const PAYABLE_STATUSES = ["hold", "released"];
+const STATUS_OPTIONS = ["released", "paid", "cancelled"];
+const PAYABLE_STATUSES = ["released"];
 const INCOME_TYPE_LABELS = {
   direct_income: "Direct Income",
   difference_income: "Difference Income",
@@ -37,9 +42,11 @@ const CATEGORY_DISPLAY_LABELS = {
   Patliputra: "Patliputra",
 };
 
+const MIN_PAYABLE = 1000;
+
 const Payout = ({ mood, setAlert }) => {
   const dispatch = useDispatch();
-  const { payout } = useSelector((state) => state.app);
+  const { payout, userDetail } = useSelector((state) => state.app);
   const [search, setSearch] = useState("");
   const [viewOpen, setViewOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -63,27 +70,67 @@ const Payout = ({ mood, setAlert }) => {
   });
   const [exportOpen, setExportOpen] = useState(false);
   const [exportCycle, setExportCycle] = useState("");
+  const [exportCategory, setExportCategory] = useState("");
 
   useEffect(() => {
     dispatch(getAccountDetails());
     dispatch(getPayout());
   }, []);
 
+  // Net amount already paid on a payout (counts paid categories, not just fully paid payouts)
+  const getPaidAmount = (i) => {
+    if (i.status === "paid") return i.netAmount || 0;
+    return (i.categoryPayments || [])
+      .filter((c) => c.status === "paid")
+      .reduce((s, c) => s + (c.netAmount || 0), 0);
+  };
+
+  // Net amount still to be paid on a payout
+  const getRemaining = (i) =>
+    PAYABLE_STATUSES.includes(i.status)
+      ? Math.max((i.netAmount || 0) - getPaidAmount(i), 0)
+      : 0;
+
   const summary = useMemo(() => {
     const data = payout || [];
 
+    const remainingByUser = {};
+    const paidByUser = {};
+    let released = 0; // everything released for payment (released + paid)
+    let paid = 0;
+    let unpaid = 0;
+    let fullyPaid = 0;
+
+    data.forEach((item) => {
+      const id = item.user?._id;
+      const paidAmt = getPaidAmount(item);
+      const remaining = getRemaining(item);
+
+      if (item.status !== "cancelled") released += item.netAmount || 0;
+      paid += paidAmt;
+      unpaid += remaining;
+      if (item.status === "paid") fullyPaid += 1;
+
+      if (!id) return;
+      if (paidAmt > 0) paidByUser[id] = (paidByUser[id] || 0) + paidAmt;
+      if (remaining > 0)
+        remainingByUser[id] = (remainingByUser[id] || 0) + remaining;
+    });
+
+    const userTotals = Object.values(remainingByUser);
+
     return {
-      released: data
-        ?.filter((i) => i.status === "released")
-        ?.reduce((s, i) => s + (i.netAmount || 0), 0),
-
-      paid: data
-        ?.filter((i) => i.status === "paid")
-        ?.reduce((s, i) => s + (i.netAmount || 0), 0),
-
+      released,
+      paid,
+      unpaid,
+      fullyPaid,
       cancelled: data
-        ?.filter((i) => i.status === "cancelled")
-        ?.reduce((s, i) => s + (i.netAmount || 0), 0),
+        .filter((i) => i.status === "cancelled")
+        .reduce((s, i) => s + (i.netAmount || 0), 0),
+      payoutCount: data.length,
+      payableCount: userTotals.filter((t) => t >= MIN_PAYABLE).length,
+      notPayableCount: userTotals.filter((t) => t < MIN_PAYABLE).length,
+      paidCount: Object.keys(paidByUser).length,
     };
   }, [payout]);
 
@@ -105,7 +152,7 @@ const Payout = ({ mood, setAlert }) => {
   }, [payout]);
 
   const filtered = useMemo(() => {
-    return (payout || []).filter((item) => {
+    const base = (payout || []).filter((item) => {
       const keyword = search.toLowerCase();
 
       const matchSearch =
@@ -115,11 +162,16 @@ const Payout = ({ mood, setAlert }) => {
       const matchFrom =
         !fromDate || new Date(item.cycleStart) >= new Date(fromDate);
       const matchTo = !toDate || new Date(item.cycleEnd) <= new Date(toDate);
-      const matchStatus = !statusFilter || item.status === statusFilter;
+      const matchStatus =
+        !statusFilter ||
+        item.status === statusFilter ||
+        (statusFilter === "paid" && getPaidAmount(item) > 0);
       const matchCycle =
         !cycleFilter || `${item.cycleStart}_${item.cycleEnd}` === cycleFilter;
       return matchSearch && matchFrom && matchTo && matchStatus && matchCycle;
     });
+
+    return base.sort((a, b) => (b.netAmount || 0) - (a.netAmount || 0));
   }, [payout, search, fromDate, toDate, statusFilter, cycleFilter]);
 
   const totalPages = Math.ceil(filtered?.length / ITEMS_PER_PAGE);
@@ -155,7 +207,25 @@ const Payout = ({ mood, setAlert }) => {
   const openView = async (item) => {
     setSelectedExpense(item);
     setViewOpen(true);
-    await fetchPayoutDetail(item);
+    setExpenseDetail(null);
+    setDetailLoading(true);
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(`${Host}/api/payout/${item._id}`, {
+        headers: { "auth-token": token },
+      });
+      setExpenseDetail(res.data);
+    } catch (err) {
+      console.log(err);
+      setAlert({
+        status: "Error",
+        message: "Unable to load payout details.",
+      });
+      setTimeout(() => setAlert(null), 3000);
+    }
+
+    setDetailLoading(false);
   };
 
   const openDirectPay = async (item) => {
@@ -166,7 +236,6 @@ const Payout = ({ mood, setAlert }) => {
 
     const detail = await fetchPayoutDetail(item);
 
-    // preselect the first still-pending category as a convenience default
     const firstPending = detail?.categoryBreakdown?.find(
       (c) => c.status !== "paid" && c.grossAmount > 0,
     );
@@ -177,35 +246,12 @@ const Payout = ({ mood, setAlert }) => {
     setOpen(true);
   };
 
-  // const openView = async (item) => {
-  //   setSelectedExpense(item);
-  //   setViewOpen(true);
-  //   setExpenseDetail(null);
-  //   setDetailLoading(true);
-
-  //   try {
-  //     const token = localStorage.getItem("token");
-  //     const res = await axios.get(`${Host}/api/payout/${item._id}`, {
-  //       headers: { "auth-token": token },
-  //     });
-  //     setExpenseDetail(res.data);
-  //   } catch (err) {
-  //     console.log(err);
-  //     setAlert({
-  //       status: "Error",
-  //       message: "Unable to load payout details.",
-  //     });
-  //     setTimeout(() => setAlert(null), 3000);
-  //   }
-
-  //   setDetailLoading(false);
-  // };
-
-  console.log(expenseDetail?.categoryBreakdown, "expenseDetail")
-
   const handlePay = async () => {
     if (!payCategory) {
-      setAlert({ status: "Error", message: "Please select a category to pay." });
+      setAlert({
+        status: "Error",
+        message: "Please select a category to pay.",
+      });
       setTimeout(() => setAlert(null), 3000);
       return;
     }
@@ -225,6 +271,7 @@ const Payout = ({ mood, setAlert }) => {
         paymentMode: formData.mode,
         transactionId: formData.transactionId || "",
         attachment: attachment || "",
+        remark: formData.remark || "",
       };
 
       await axios.put(
@@ -259,39 +306,66 @@ const Payout = ({ mood, setAlert }) => {
     setSaving(false);
   };
 
-
   const getExportUsers = () => {
     if (!payout || !Array.isArray(payout)) {
       return [];
     }
 
-    if (!exportCycle) {
-      return payout;
+    let base = exportCycle
+      ? payout.filter(
+          (item) => `${item.cycleStart}_${item.cycleEnd}` === exportCycle,
+        )
+      : payout;
+
+    if (exportCategory) {
+      base = base.filter((item) =>
+        (item.categoryPayments || []).some(
+          (c) => c.category === exportCategory,
+        ),
+      );
     }
 
-    return payout.filter(
-      (item) => `${item.cycleStart}_${item.cycleEnd}` === exportCycle,
-    );
+    // match the table's own sort order (highest netAmount first)
+    return [...base].sort((a, b) => (b.netAmount || 0) - (a.netAmount || 0));
   };
+
+  const canPay = (item) =>
+    PAYABLE_STATUSES.includes(item.status) &&
+    (payableTotalsByUser[item.user?._id] || 0) >= MIN_PAYABLE;
 
   /* =====================================================
      FORMAT USER DATA FOR EXPORT
   ===================================================== */
+  const fmt2 = (n) => (Number(n) || 0).toFixed(2);
+  const getCategoryText = (item) => {
+    let entries = item?.categoryPayments || [];
+    if (exportCategory) {
+      entries = entries.filter((c) => c.category === exportCategory);
+    }
+    if (!entries.length) return "-";
+    return entries
+      .map((c) => {
+        const name = CATEGORY_DISPLAY_LABELS[c.category] || c.category;
+        return `${name} (${c.status === "paid" ? "Paid" : "Unpaid"})`;
+      })
+      .join(", ");
+  };
 
   const getExportRows = () => {
     const selectedUsers = getExportUsers();
 
-    return selectedUsers.map((item) => {
+    return selectedUsers.map((item, index) => {
       return {
+        "S.No": index + 1,
         Name: item?.user?.name || "-",
-        Phone: item?.user?.phone || "-",
         Email: item?.user?.email || "-",
         UserID: item?.user?.referralId || "-",
         Cycle: `${formatDate(item.cycleStart)} - ${formatDate(item.cycleEnd)}`,
-        Gross: item?.grossAmount,
-        TDS: item?.tdsAmount,
-        AdminCharge: item?.adminChargeAmount,
-        Net: item?.netAmount,
+        Category: getCategoryText(item), // <-- new
+        Gross: fmt2(item?.grossAmount),
+        TDS: fmt2(item?.tdsAmount),
+        AdminCharge: fmt2(item?.adminChargeAmount),
+        Net: fmt2(item?.netAmount),
         Status: item?.status,
         PaymentMode: item?.paymentMode || "-",
         TransactionId: item?.transactionId || "-",
@@ -326,9 +400,7 @@ const Payout = ({ mood, setAlert }) => {
     const columnWidths = Object.keys(rows[0]).map((key) => {
       const maxLength = Math.max(
         key.length,
-        ...rows.map((row) =>
-          String(row[key] ?? "").length
-        )
+        ...rows.map((row) => String(row[key] ?? "").length),
       );
 
       return {
@@ -340,11 +412,7 @@ const Payout = ({ mood, setAlert }) => {
 
     const workbook = XLSX.utils.book_new();
 
-    XLSX.utils.book_append_sheet(
-      workbook,
-      worksheet,
-      "Users"
-    );
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
 
     // in exportToExcel:
     const fileName = exportCycle
@@ -368,8 +436,25 @@ const Payout = ({ mood, setAlert }) => {
   /* =====================================================
      EXPORT PDF
   ===================================================== */
+  const loadLogo = (src) =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        resolve({
+          data: canvas.toDataURL("image/png"),
+          ratio: img.naturalWidth / img.naturalHeight,
+        });
+      };
+      img.onerror = () => resolve(null); // export still works without the logo
+      img.src = src;
+    });
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     const rows = getExportRows();
 
     if (!rows.length) {
@@ -377,11 +462,7 @@ const Payout = ({ mood, setAlert }) => {
         message: "No users found for selected filter",
         status: "Error",
       });
-
-      setTimeout(() => {
-        setAlert(null);
-      }, 3000);
-
+      setTimeout(() => setAlert(null), 3000);
       return;
     }
 
@@ -391,128 +472,85 @@ const Payout = ({ mood, setAlert }) => {
       format: "a4",
     });
 
-    const cycleLabel = cycles.find((c) => c.value === exportCycle)?.label;
+    const logoImg = await loadLogo(logo);
+    const LOGO_HEIGHT = 14; // mm
+    const RIGHT_MARGIN = 5; // matches this table's right margin
 
+    const drawLogo = () => {
+      if (!logoImg) return;
+      const w = LOGO_HEIGHT * logoImg.ratio; // keeps the aspect ratio
+      const x = doc.internal.pageSize.getWidth() - RIGHT_MARGIN - w;
+      doc.addImage(logoImg.data, "PNG", x, 6, w, LOGO_HEIGHT);
+    };
+
+    const cycleLabel = cycles.find((c) => c.value === exportCycle)?.label;
     const title = exportCycle ? `Payouts — ${cycleLabel}` : "All Payouts";
 
-    doc.setFontSize(18);
+    doc.setFontSize(25);
     doc.text(title, 14, 15);
 
-    doc.setFontSize(9);
-    doc.text(
-      `Total Records: ${rows.length}`,
-      14,
-      22
-    );
+    doc.setFontSize(24);
+    doc.text(`Total Records: ${rows.length}`, 14, 22);
 
     const columns = Object.keys(rows[0]);
+    const body = rows.map((row) => columns.map((column) => row[column] ?? "-"));
 
-    const body = rows.map((row) =>
-      columns.map((column) => row[column] ?? "-")
+    // relative proportions — scaled below to always fill the printable width
+    const baseWidths = {
+      "S.No": 8,
+      Name: 20,
+      Email: 28,
+      UserID: 20,
+      Cycle: 20,
+      Gross: 16,
+      TDS: 14,
+      AdminCharge: 18,
+      Net: 18,
+      Status: 15,
+      PaymentMode: 18,
+      TransactionId: 30,
+    };
+
+    const margin = { top: 27, left: 5, right: 5, bottom: 8 };
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const availableWidth = pageWidth - margin.left - margin.right;
+
+    const totalBase = columns.reduce(
+      (sum, col) => sum + (baseWidths[col] || 18),
+      0,
     );
+    const scale = availableWidth / totalBase;
 
     const columnStyles = {};
-
     columns.forEach((column, index) => {
-      let width = 18;
-
-      switch (column) {
-        case "Name":
-          width = 20;
-          break;
-
-        case "Phone":
-          width = 17;
-          break;
-
-        case "Email":
-          width = 28;
-          break;
-
-        case "UserID":
-          width = 20;
-          break;
-
-        case "Cycle":
-          width = 20;
-          break;
-
-        case "Gross":
-          width = 28;
-          break;
-
-        case "TDS":
-          width = 17;
-          break;
-
-        case "Admin Charge":
-          width = 20;
-          break;
-
-        case "Net":
-          width = 25;
-          break;
-
-        case "Status":
-          width = 17;
-          break;
-
-        case "Payment Mode":
-          width = 20;
-          break;
-
-        case "Transaction Id":
-          width = 45;
-          break;
-
-        default:
-          width = 18;
-      }
-
-      columnStyles[index] = {
-        cellWidth: width,
-      };
+      const base = baseWidths[column] || 18;
+      columnStyles[index] = { cellWidth: base * scale };
     });
 
     autoTable(doc, {
       head: [columns],
       body,
-
-      startY: 27,
-
+      startY: margin.top,
       theme: "grid",
-
-      tableWidth: "wrap",
-
+      tableWidth: "auto",
       styles: {
-        fontSize: 5.5,
-        cellPadding: 1.2,
+        fontSize: 8,
+        cellPadding: 1.4,
         overflow: "linebreak",
         valign: "middle",
         halign: "left",
         lineWidth: 0.1,
       },
-
       headStyles: {
-        fontSize: 5.5,
+        fontSize: 6,
         fontStyle: "bold",
         valign: "middle",
       },
-
-      bodyStyles: {
-        valign: "middle",
-      },
-
+      bodyStyles: { valign: "middle" },
       columnStyles,
-
-      margin: {
-        top: 27,
-        left: 5,
-        right: 5,
-        bottom: 8,
-      },
+      margin,
+      didDrawPage: drawLogo,
     });
-
 
     const fileName = exportCycle
       ? `payouts-${exportCycle.split("_")[0]?.slice(0, 10)}-to-${exportCycle.split("_")[1]?.slice(0, 10)}.pdf`
@@ -524,14 +562,35 @@ const Payout = ({ mood, setAlert }) => {
       message: "PDF exported successfully",
       status: "Success",
     });
-
-    setTimeout(() => {
-      setAlert(null);
-    }, 3000);
-
+    setTimeout(() => setAlert(null), 3000);
     setExportOpen(false);
   };
 
+  // Total payable (hold + released) net amount per associate — used to
+  // decide whether to show the Pay button even when a single payout's
+  // netAmount is below the ₹1000 threshold.
+  const payableTotalsByUser = useMemo(() => {
+    const totals = {};
+
+    (payout || []).forEach((item) => {
+      if (!PAYABLE_STATUSES.includes(item.status)) return;
+
+      const id = item.user?._id;
+      if (!id) return;
+
+      totals[id] = (totals[id] || 0) + (item.netAmount || 0);
+    });
+
+    return totals;
+  }, [payout]);
+
+  const myPayoutWallet = useMemo(() => {
+    const myId = userDetail?._id;
+    if (!myId) return 0;
+    return payableTotalsByUser[myId] || 0;
+  }, [payableTotalsByUser, userDetail]);
+
+  console.log(expenseDetail, "payCategory");
   return (
     <div className="plot-container">
       <div className="table-filters">
@@ -554,10 +613,34 @@ const Payout = ({ mood, setAlert }) => {
               value={`₹${formatCurrency(summary.paid)}`}
               icons={<NiPayments />}
             />
-
             <DashboardCard
-              title="Cancelled"
-              value={`₹${formatCurrency(summary.cancelled)}`}
+              title="Unpaid"
+              value={`₹${formatCurrency(summary.unpaid)}`}
+              icons={<NiPayments />}
+            />
+            <DashboardCard
+              title="No. of Payout"
+              value={summary.payoutCount}
+              icons={<NiPayments />}
+            />
+            <DashboardCard
+              title="No. of Payable (Person)"
+              value={summary.payableCount}
+              icons={<NiPayments />}
+            />
+            <DashboardCard
+              title="No. of UnPayable (Person)"
+              value={summary.notPayableCount}
+              icons={<NiPayments />}
+            />
+            <DashboardCard
+              title="No. of Paid (Person)"
+              value={summary.fullyPaid}
+              icons={<NiPayments />}
+            />
+            <DashboardCard
+              title={`Payout Wallet (${mood == "admin" ? "Admin" : mood === "agent" ? "Associate" : "Staff"})`}
+              value={`₹${formatCurrency(myPayoutWallet)}`}
               icons={<NiPayments />}
             />
           </div>
@@ -575,7 +658,7 @@ const Payout = ({ mood, setAlert }) => {
                 }}
               />
             </div>
-            <div className="searchItem">
+            {/* <div className="searchItem">
               <label>From</label>
               <input
                 type="date"
@@ -591,8 +674,8 @@ const Payout = ({ mood, setAlert }) => {
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
               />
-            </div>
-            <div className="searchItem">
+            </div> */}
+            {/* <div className="searchItem">
               <select
                 value={statusFilter}
                 onChange={(e) => {
@@ -623,11 +706,42 @@ const Payout = ({ mood, setAlert }) => {
                 ))}
                 <option value="">All Cycles</option>
               </select>
-            </div>
+            </div> */}
+            <CustomSelect
+              className="cs-filter"
+              value={statusFilter}
+              onChange={(v) => {
+                setStatusFilter(v);
+                setPage(1);
+              }}
+              placeholder="All Status"
+              options={[
+                { value: "", label: "All Status" },
+                ...STATUS_OPTIONS.map((s) => ({
+                  value: s,
+                  label: s.charAt(0).toUpperCase() + s.slice(1),
+                })),
+              ]}
+            />
+
+            <CustomSelect
+              className="cs-filter"
+              value={cycleFilter}
+              onChange={(v) => {
+                setCycleFilter(v);
+                setPage(1);
+              }}
+              placeholder="All Cycles"
+              options={[
+                { value: "", label: "All Cycles" },
+                ...cycles.map((c) => ({ value: c.value, label: c.label })),
+              ]}
+            />
             <button
               className="add-button"
               onClick={() => {
                 setExportCycle("");
+                setExportCategory("");
                 setExportOpen(true);
               }}
             >
@@ -677,24 +791,30 @@ const Payout = ({ mood, setAlert }) => {
                     <span>
                       <span
                         style={{ textTransform: "capitalize" }}
-                        className={`status ${item.status === "paid"
-                          ? "active"
-                          : item.status === "released"
-                            ? "pending"
-                            : "failed"
-                          }`}
+                        className={`status ${
+                          item.status === "paid"
+                            ? "active"
+                            : item.status === "released"
+                              ? "pending"
+                              : "failed"
+                        }`}
                       >
-                        {item.status}
+                        {item.status !== "paid" && getPaidAmount(item) > 0
+                          ? "Partially"
+                          : item.status}
                       </span>
                     </span>
 
                     <div className="dots">
-                      <span onClick={() => openView(item)}>
+                      <span
+                        onClick={() => openView(item)}
+                        style={{ border: "none" }}
+                      >
                         <NiOpenEye />
                       </span>
                       {mood === "admin" && (
                         <div className="modal-actions">
-                          {PAYABLE_STATUSES.includes(item.status) && (
+                          {canPay(item) && (
                             <button
                               className="table-btn"
                               onClick={() => openDirectPay(item)}
@@ -704,6 +824,34 @@ const Payout = ({ mood, setAlert }) => {
                           )}
                         </div>
                       )}
+                      {/* {item.status === "paid" && ( */}
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        title="Print receipt"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const token = localStorage.getItem("token");
+                            const res = await axios.get(
+                              `${Host}/api/payout/${item._id}`,
+                              {
+                                headers: { "auth-token": token },
+                              },
+                            );
+                            printPayoutStatement({
+                              ...item,
+                              categoryBreakdown: res.data.categoryBreakdown,
+                            });
+                          } catch (err) {
+                            console.log(err);
+                            printPayoutStatement(item); // still prints, just without category amounts
+                          }
+                        }}
+                      >
+                        <NiReceipt />
+                      </span>
+                      {/* )} */}
                     </div>
                   </div>
                 ))
@@ -711,28 +859,7 @@ const Payout = ({ mood, setAlert }) => {
             </div>
           </div>
 
-          <div className="pagination">
-            <button disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-              Prev
-            </button>
-
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <button
-                key={i}
-                className={page === i + 1 ? "active" : ""}
-                onClick={() => setPage(i + 1)}
-              >
-                {i + 1}
-              </button>
-            ))}
-
-            <button
-              disabled={page === totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </button>
-          </div>
+          <Pagination page={page} totalPages={totalPages} setPage={setPage} />
         </div>
 
         <ViewModal
@@ -769,10 +896,20 @@ const Payout = ({ mood, setAlert }) => {
               {expenseDetail?.categoryDisplay?.map((i) => (
                 <div className="history-card" key={i._id}>
                   <h5>{i.category}</h5>
-                  <p><strong>Gross Amount : </strong>₹{formatCurrency(i.grossAmount)}</p>
-                  <p><strong>Admin Charge : </strong>₹{formatCurrency(i.adminChargeAmount)}</p>
-                  <p><strong>TDS : </strong>₹{formatCurrency(i.tdsAmount)}</p>
-                  <p><strong>Net Amount : </strong>₹{formatCurrency(i.netAmount)}</p>
+                  <p>
+                    <strong>Gross Amount : </strong>₹
+                    {formatCurrency(i.grossAmount)}
+                  </p>
+                  <p>
+                    <strong>Admin Charge : </strong>₹
+                    {formatCurrency(i.adminChargeAmount)}
+                  </p>
+                  <p>
+                    <strong>TDS : </strong>₹{formatCurrency(i.tdsAmount)}
+                  </p>
+                  <p>
+                    <strong>Net Amount : </strong>₹{formatCurrency(i.netAmount)}
+                  </p>
                   <p>
                     <strong>Status : </strong>
                     <span
@@ -785,13 +922,29 @@ const Payout = ({ mood, setAlert }) => {
 
                   {i.status === "paid" ? (
                     <>
-                      {i.paymentMode && <p><strong>Payment Mode : </strong>{i.paymentMode}</p>}
-                      {i.transactionId && <p><strong>Transaction Id : </strong>{i.transactionId}</p>}
-                      {i.paidAt && <p><strong>Paid At : </strong>{formatDate(i.paidAt)}</p>}
+                      {i.paymentMode && (
+                        <p>
+                          <strong>Payment Mode : </strong>
+                          {i.paymentMode}
+                        </p>
+                      )}
+                      {i.transactionId && (
+                        <p>
+                          <strong>Transaction Id : </strong>
+                          {i.transactionId}
+                        </p>
+                      )}
+                      {i.paidAt && (
+                        <p>
+                          <strong>Paid At : </strong>
+                          {formatDate(i.paidAt)}
+                        </p>
+                      )}
                     </>
                   ) : (
                     i.isPayable &&
-                    mood === "admin" && (
+                    mood === "admin" &&
+                    canPay(selectedExpense) && (
                       <div className="modal-actions">
                         <button
                           className="table-btn"
@@ -803,7 +956,8 @@ const Payout = ({ mood, setAlert }) => {
                             setOpen(true);
                           }}
                         >
-                          Pay {CATEGORY_DISPLAY_LABELS[i.payBucket] || i.payBucket}
+                          Pay{" "}
+                          {CATEGORY_DISPLAY_LABELS[i.payBucket] || i.payBucket}
                         </button>
                       </div>
                     )
@@ -811,7 +965,9 @@ const Payout = ({ mood, setAlert }) => {
 
                   {!i.isPayable && i.status !== "paid" && (
                     <p style={{ fontSize: "0.85rem", color: "#777" }}>
-                      Included in the {CATEGORY_DISPLAY_LABELS[i.payBucket] || i.payBucket} payment above.
+                      Included in the{" "}
+                      {CATEGORY_DISPLAY_LABELS[i.payBucket] || i.payBucket}{" "}
+                      payment above.
                     </p>
                   )}
                 </div>
@@ -863,12 +1019,13 @@ const Payout = ({ mood, setAlert }) => {
                 <strong>Status :</strong>
                 <span
                   style={{ textTransform: "capitalize" }}
-                  className={`status ${selectedExpense?.status === "paid"
-                    ? "active"
-                    : selectedExpense?.status === "released"
-                      ? "pending"
-                      : "failed"
-                    }`}
+                  className={`status ${
+                    selectedExpense?.status === "paid"
+                      ? "active"
+                      : selectedExpense?.status === "released"
+                        ? "pending"
+                        : "failed"
+                  }`}
                 >
                   {selectedExpense?.status}
                 </span>
@@ -947,8 +1104,9 @@ const Payout = ({ mood, setAlert }) => {
                         <strong>Status :</strong>
                         <span
                           style={{ textTransform: "capitalize" }}
-                          className={`status ${h.status === "credited" ? "active" : "pending"
-                            }`}
+                          className={`status ${
+                            h.status === "credited" ? "active" : "pending"
+                          }`}
                         >
                           {h.status}
                         </span>
@@ -981,8 +1139,8 @@ const Payout = ({ mood, setAlert }) => {
               {(() => {
                 const categoryEntry = payCategory
                   ? expenseDetail?.categoryBreakdown?.find(
-                    (c) => c.category === payCategory,
-                  )
+                      (c) => c.category === payCategory,
+                    )
                   : null;
 
                 const displayNet = categoryEntry
@@ -1002,7 +1160,8 @@ const Payout = ({ mood, setAlert }) => {
                   <div className="summary-card">
                     <h4>{selectedExpense.user?.name}</h4>
                     <p>
-                      <strong>Referral :</strong> {selectedExpense.user?.referralId}
+                      <strong>Referral :</strong>{" "}
+                      {selectedExpense.user?.referralId}
                     </p>
                     <p>
                       <strong>Cycle :</strong>{" "}
@@ -1010,28 +1169,35 @@ const Payout = ({ mood, setAlert }) => {
                       {formatDate(selectedExpense.cycleEnd)}
                     </p>
                     <p>
-                      <strong>Gross Amount :</strong> ₹{formatCurrency(displayGross)}
+                      <strong>Gross Amount :</strong> ₹
+                      {formatCurrency(displayGross)}
                     </p>
                     <p>
                       <strong>TDS :</strong> ₹{formatCurrency(displayTds)}
                     </p>
                     <p>
-                      <strong>Admin Charge :</strong> ₹{formatCurrency(displayAdmin)}
+                      <strong>Admin Charge :</strong> ₹
+                      {formatCurrency(displayAdmin)}
                     </p>
                     <p style={{ color: "green", fontWeight: 600 }}>
-                      <strong>Net Amount to pay :</strong> ₹{formatCurrency(displayNet)}
+                      <strong>Net Amount to pay :</strong> ₹
+                      {formatCurrency(displayNet)}
                     </p>
                   </div>
                 );
               })()}
 
               <p>
-                This will mark the {payCategory ? `${CATEGORY_DISPLAY_LABELS[payCategory] || payCategory} portion` : "selected category"} as paid and cannot be undone.
+                This will mark the{" "}
+                {payCategory
+                  ? `${CATEGORY_DISPLAY_LABELS[payCategory] || payCategory} portion`
+                  : "selected category"}{" "}
+                as paid and cannot be undone.
               </p>
 
               <h4>Payment</h4>
 
-              <div className="field">
+              {/* <div className="field">
                 <label>Category</label>
                 <select
                   value={payCategory || ""}
@@ -1051,13 +1217,33 @@ const Payout = ({ mood, setAlert }) => {
                       </option>
                     ))}
                 </select>
+              </div> */}
+              <div className="field">
+                <label>Category</label>
+                <CustomSelect
+                  value={payCategory || ""}
+                  onChange={setPayCategory}
+                  placeholder="Select Category"
+                  options={[
+                    { value: "", label: "Select Category" },
+                    ...(expenseDetail?.categoryBreakdown || [])
+                      .filter((c) => c.grossAmount > 0)
+                      .map((c) => ({
+                        value: c.category,
+                        label: `${CATEGORY_DISPLAY_LABELS[c.category] || c.category}${c.status === "paid" ? " (Paid)" : ""}`,
+                        disabled: c.status === "paid",
+                      })),
+                  ]}
+                />
               </div>
 
-              <div className="field">
+              {/* <div className="field">
                 <label>Payment Mode</label>
                 <select
                   value={formData.mode}
-                  onChange={(e) => setFormData({ ...formData, mode: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, mode: e.target.value })
+                  }
                 >
                   <option value="">Select Mode</option>
                   <option value="cash">Cash</option>
@@ -1065,6 +1251,21 @@ const Payout = ({ mood, setAlert }) => {
                   <option value="cheque">Cheque</option>
                   <option value="bank">Bank Transfer</option>
                 </select>
+              </div> */}
+              <div className="field">
+                <label>Payment Mode</label>
+                <CustomSelect
+                  value={formData.mode || ""}
+                  onChange={(v) => setFormData({ ...formData, mode: v })}
+                  placeholder="Select Mode"
+                  options={[
+                    { value: "", label: "Select Mode" },
+                    { value: "cash", label: "Cash" },
+                    { value: "upi", label: "UPI" },
+                    { value: "cheque", label: "Cheque" },
+                    { value: "bank", label: "Bank Transfer" },
+                  ]}
+                />
               </div>
 
               {(formData.mode === "upi" || formData.mode === "bank") && (
@@ -1074,7 +1275,25 @@ const Payout = ({ mood, setAlert }) => {
                     placeholder="Enter Transaction ID"
                     value={formData.transactionId || ""}
                     onChange={(e) =>
-                      setFormData({ ...formData, transactionId: e.target.value })
+                      setFormData({
+                        ...formData,
+                        transactionId: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              )}
+              {(formData.mode === "cash" || formData.mode === "cheque") && (
+                <div className="field">
+                  <label>Remark *</label>
+                  <input
+                    placeholder="Enter Remark"
+                    value={formData.remark || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        remark: e.target.value,
+                      })
                     }
                   />
                 </div>
@@ -1132,7 +1351,7 @@ const Payout = ({ mood, setAlert }) => {
 
             <label>Payouts in selection: {getExportUsers().length}</label>
 
-            <select
+            {/* <select
               value={exportCycle}
               onChange={(e) => setExportCycle(e.target.value)}
             >
@@ -1143,6 +1362,41 @@ const Payout = ({ mood, setAlert }) => {
                 </option>
               ))}
             </select>
+            <select
+              value={exportCategory}
+              onChange={(e) => setExportCategory(e.target.value)}
+            >
+              <option value="">All Categories</option>
+              {Object.entries(CATEGORY_DISPLAY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select> */}
+            <CustomSelect
+              value={exportCycle}
+              onChange={setExportCycle}
+              placeholder="All Cycles"
+              options={[
+                { value: "", label: "All Cycles" },
+                ...cycles.map((c) => ({ value: c.value, label: c.label })),
+              ]}
+            />
+
+            <CustomSelect
+              value={exportCategory}
+              onChange={setExportCategory}
+              placeholder="All Categories"
+              options={[
+                { value: "", label: "All Categories" },
+                ...Object.entries(CATEGORY_DISPLAY_LABELS).map(
+                  ([value, label]) => ({
+                    value,
+                    label,
+                  }),
+                ),
+              ]}
+            />
 
             <div className="export-fields">
               <p>Export includes:</p>
@@ -1179,7 +1433,6 @@ const Payout = ({ mood, setAlert }) => {
               <FileText size={18} />
               PDF
             </button>
-
           </div>
 
           {/* </div> */}

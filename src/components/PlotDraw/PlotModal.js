@@ -221,6 +221,28 @@ const PlotModal = ({
                     />
                   </div>
                 </div>
+                {/* PLC */}
+                <div className="field">
+                  <label>PLC (Preferred Location Charge)</label>
+
+                  <select
+                    value={plot.plc ? "true" : "false"}
+                    onChange={(e) =>
+                      updatePlot(plot._id, {
+                        plc: e.target.value === "true",
+                      })
+                    }
+                  >
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+
+                  {plot.plc && (
+                    <p className="hint">
+                      PLC % (5–10%) is chosen by admin when approving a booking.
+                    </p>
+                  )}
+                </div>
               </>
             )}
 

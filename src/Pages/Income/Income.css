@@ -1,10 +1,42 @@
-.table.income-table .table-head ,
+.table.income-table .table-head,
 .table.income-table .table-row {
-    grid-template-columns: 40px 100px 1fr 180px 180px 140px 1fr 100px 60px;
-    gap: 5px;
+  grid-template-columns: 40px 120px 1fr 180px 120px 1.2fr 100px 60px;
 }
 
-.dashboard-row span,
-.table-row span{
-    text-transform: capitalize;
+.income-tabs {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: center;
+}
+.income-tabs button {
+  border-radius: 12px 12px 0 0;
+  border: none;
+  cursor: pointer;
+  background: #fcfaf3;
+    border: 0.1px solid #bdbaad;
+  box-shadow:
+    0px 3px 8px #00000014,
+    0 0 #0000,
+    0 0 #0000,
+    0 0 #0000,
+    0px 3px 8px #00000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 30px 8px;
+}
+
+.income-tabs button.active {
+  background-color: var(--mood-color);
+  color: white;
+}
+
+.slab-note {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: #9a6a00;
+  background: #fff3c4;
+  padding: 0.15rem 0.6rem !important;
+  border-radius: 999px;
 }

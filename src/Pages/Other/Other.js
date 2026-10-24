@@ -28,6 +28,7 @@ import {
 import NiUser from "../../icons/ni-user";
 import Stars from "../../components/Utils/Stars";
 import UserForm from "../../components/UserForm/UserForm";
+import Pagination from "../../components/Pagination/Pagination";
 
 const ITEMS_PER_PAGE = 15;
 const Other = ({ mood, setAlert, data }) => {
@@ -536,7 +537,7 @@ const Other = ({ mood, setAlert, data }) => {
         </div>
       )}
       {/* Pagination */}
-      {totalPages > 1 && (
+      {/* {totalPages > 1 && (
         <div className="pagination">
           <button
             disabled={currentPage === 1}
@@ -562,7 +563,8 @@ const Other = ({ mood, setAlert, data }) => {
             Next
           </button>
         </div>
-      )}
+      )} */}
+      <Pagination page={currentPage} totalPages={totalPages} setPage={setCurrentPage} />
       <AddLocationModal
         open={open}
         onClose={() => setOpen(false)}

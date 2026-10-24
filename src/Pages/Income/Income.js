@@ -3,7 +3,7 @@ import Breadcrumb from "../../components/Breadcrumb/Breadcrumb";
 import DashboardCard from "../../components/Cards/DashboardCard";
 import NiPayments from "../../icons/ni-payments";
 import PaymentCard from "../../components/Cards/PaymentCard";
-import { getAccountDetails, getIncome } from "../../Redux/Slices/AppSlices";
+import { getAccountDetails, getIncome, getIncomeSummary, getPayments } from "../../Redux/Slices/AppSlices";
 import { useDispatch, useSelector } from "react-redux";
 import NiSearch from "../../icons/ni-search";
 import InvoiceCard from "../../components/Cards/InvoiceCard";
@@ -12,26 +12,88 @@ import formatDate from "../../components/DateFormate/DateFormate";
 import "./Income.css";
 import NiOpenEye from "../../icons/ni-openEye";
 import ViewModal from "../../components/Modals/ViewModal";
+import Pagination from "../../components/Pagination/Pagination";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import AddLocationModal from "../../components/Modals/AddLocationModal";
+import logo from "../../Assets/Logo/logo-anokhi-home-green.png";
+import CustomSelect from "../../components/CustomSelect/CustomSelect";
+
+const EXPORT_COLUMNS = [
+  "S.No",
+  "Date",
+  "Name",
+  "Phone",
+  "Referral ID",
+  "Income Type",
+  "Amount",
+  "From",
+  "From Phone",
+];
+const EXPORT_COLUMNS2 = [
+  "S.No",
+  "Date",
+  "Name",
+  "Phone",
+  "Referral ID",
+  "Income Type",
+  "Amount",
+  "Project",
+  "Company",
+];
+
+const STATUS_OPTIONS = ["credited", "pending", "failed"];
+const DESIGNATION_OPTIONS = [
+  "Sales Executive",
+  "Senior Sales Executive",
+  "Team Leader",
+  "Senior Team Leader",
+  "Assistant Manager",
+  "Sales Manager",
+  "Senior Sales Manager",
+  "Assistant General Manager (AGM)",
+  "General Manager (GM)",
+  "Assistant Vice President (AVP)",
+  "Vice President (VP)",
+  "Senior Vice President (SVP)",
+  "Associate Director",
+  "Deputy Director",
+  "Director",
+  "Executive Director",
+];
 
 const Income = ({ mood, setAlert }) => {
   const dispatch = useDispatch();
-  const { userDetail, incomeHistory } = useSelector((state) => state.app);
+  const { userDetail, incomeHistory, incomeSummary } = useSelector((state) => state.app);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedIncome, setSelectedIncome] = useState(null);
   const [page, setPage] = useState(1);
-  const ITEMS_PER_PAGE = 15;
+  const ITEMS_PER_PAGE = 25;
   const [designationFilter, setDesignationFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Which agent's FULL history to export ("" = use current filtered/table results)
+  const [exportAgentId, setExportAgentId] = useState("");
+
   useEffect(() => {
     dispatch(getAccountDetails());
     dispatch(getIncome());
+    dispatch(getIncomeSummary());
+    dispatch(getPayments());
   }, []);
 
+  const [tabActive, setTabActive] = useState("other");
+
   const filtered = useMemo(() => {
-    return incomeHistory?.filter((income) => {
+    return (incomeHistory || []).filter((income) => {
+
+      // Search
       const searchValue = search.toLowerCase();
 
       const matchSearch =
@@ -40,21 +102,40 @@ const Income = ({ mood, setAlert }) => {
         income?.user?.phone?.includes(search) ||
         income?.user?.referralId?.toLowerCase()?.includes(searchValue);
 
+      // Designation
       const matchDesignation =
         designationFilter === "" ||
         income?.user?.designation === designationFilter;
 
+      // Status
       const matchStatus =
-        statusFilter === "" || income?.status === statusFilter;
+        statusFilter === "" ||
+        income?.status === statusFilter;
 
+      // Date
       const incomeDate = new Date(income.createdAt);
 
-      const matchFrom = !fromDate || incomeDate >= new Date(fromDate);
+      const matchFrom =
+        !fromDate ||
+        incomeDate >= new Date(fromDate);
 
-      const matchTo = !toDate || incomeDate <= new Date(`${toDate}T23:59:59`);
+      const matchTo =
+        !toDate ||
+        incomeDate <= new Date(`${toDate}T23:59:59`);
+
+      // Tab
+      const matchTab =
+        tabActive === "referral"
+          ? income?.type === "referal_income"
+          : income?.type !== "referal_income";
 
       return (
-        matchSearch && matchDesignation && matchStatus && matchFrom && matchTo
+        matchSearch &&
+        matchDesignation &&
+        matchStatus &&
+        matchFrom &&
+        matchTo &&
+        matchTab
       );
     });
   }, [
@@ -64,6 +145,7 @@ const Income = ({ mood, setAlert }) => {
     fromDate,
     toDate,
     incomeHistory,
+    tabActive,
   ]);
 
   const totalPages = Math.ceil(filtered?.length / ITEMS_PER_PAGE);
@@ -72,78 +154,482 @@ const Income = ({ mood, setAlert }) => {
     page * ITEMS_PER_PAGE,
   );
 
+  // Add this near your other useMemo hooks, after userDetail/incomeHistory are available
+  const ownIncomeHistory = useMemo(() => {
+    return (incomeHistory || []).filter(
+      (item) => item?.user?._id === userDetail?._id
+    );
+  }, [incomeHistory, userDetail]);
+
   const totalIncome =
     incomeHistory?.reduce((acc, item) => acc + item.amount, 0) || 0;
-
-  const creditedIncome =
-    incomeHistory
-      ?.filter((i) => i.status === "credited")
-      ?.reduce((acc, item) => acc + item.amount, 0) || 0;
-
-  const pendingIncome =
-    incomeHistory
-      ?.filter((i) => i.status === "pending")
-      ?.reduce((acc, item) => acc + item.amount, 0) || 0;
 
   const todayIncome =
     incomeHistory
       ?.filter((i) => {
         const today = new Date().toDateString();
-
-        return new Date(i.createdAt).toDateString() === today;
+        return (
+          i.type !== "referal_income" &&
+          new Date(i.createdAt).toDateString() === today
+        );
       })
       ?.reduce((acc, item) => acc + item.amount, 0) || 0;
 
-  // console.log(incomeHistory, "incomeHistory");
+  const referralIncome =
+    ownIncomeHistory
+      ?.filter((i) => i.type === "referal_income")
+      ?.reduce((acc, item) => acc + (item.amount || 0), 0) || 0;
+
+  const otherIncome =
+    incomeHistory
+      ?.filter((i) => i.type !== "referal_income")
+      ?.reduce((acc, item) => acc + (item.amount || 0), 0) || 0;
+
+  // console.log(incomeSummary,"incomeSummary")
+  const currentUser = incomeSummary?.find((item) => item._id === userDetail?._id);
+
+  // Unique list of agents present in the income history, used to populate
+  // the "select agent" dropdown inside the export modal.
+  const agentOptions = useMemo(() => {
+    const map = new Map();
+
+    (incomeHistory || []).forEach((item) => {
+      const u = item?.user;
+      const id = u?._id;
+
+      if (id && !map.has(id)) {
+        map.set(id, {
+          id,
+          name: u?.name || "Unnamed",
+          referralId: u?.referralId || "-",
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      (a.name || "").localeCompare(b.name || ""),
+    );
+  }, [incomeHistory]);
+
+  const selectedAgent = useMemo(
+    () => agentOptions.find((a) => a.id === exportAgentId) || null,
+    [agentOptions, exportAgentId],
+  );
+
+  const fmt2 = (n) => (Number(n) || 0).toFixed(2);
+  // console.log(paginated, "paginated")
+  // const getExportRows = (rows) => {
+  //   return (rows || []).map((item, index) => ({
+  //     "S.No": index + 1,
+  //     "Date": formatDate(item.createdAt) || "",
+  //     "Name": item?.user?.name || "-",
+  //     "Phone": item?.user?.phone || "",
+  //     "Referral ID": item?.user?.referralId || "-",
+  //     "Income Type": item.type || "",
+  //     "Amount": fmt2(item.amount) || "",
+  //     "From": item.fromUser ? item.fromUser.name : item?.payment?.customer?.name || "",
+  //     "From Phone": item.fromUser ? item.fromUser.phone : item?.payment?.customer?.phone || "",
+  //   }));
+  // };
+
+  const loadLogo = (src) =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        resolve({
+          data: canvas.toDataURL("image/png"),
+          ratio: img.naturalWidth / img.naturalHeight,
+        });
+      };
+      img.onerror = () => resolve(null); // export still works without the logo
+      img.src = src;
+    });
+
+  const PLOT_INCOME_TYPES = ["direct_income", "difference_income"];
+  const isOtherTab = tabActive === "other";
+  const exportColumns = isOtherTab ? EXPORT_COLUMNS2 : EXPORT_COLUMNS;
+
+  const getExportRows = (rows) => {
+    const [col8, col9] = exportColumns.slice(-2);
+
+    return (rows || []).map((item, index) => {
+      const booking = item?.payment?.booking;
+      const hold = item?.payment?.hold;
+      const plot = booking?.plot || hold?.plot;
+      const colony = booking?.colony || hold?.colony;
+
+      const value8 = isOtherTab
+        ? [plot?.plotNumber, colony?.name].filter(Boolean).join(", ")
+        : item.fromUser
+          ? item.fromUser.name
+          : item?.payment?.customer?.name || "";
+
+      const value9 = isOtherTab
+        ? colony?.category || ""
+        : item.fromUser
+          ? item.fromUser.phone
+          : item?.payment?.customer?.phone || "";
+
+      return {
+        "S.No": index + 1,
+        "Date": formatDate(item.createdAt) || "",
+        "Name": item?.user?.name || "-",
+        "Phone": item?.user?.phone || "",
+        "Referral ID": item?.user?.referralId || "-",
+        "Income Type": item.type || "",
+        "Amount": fmt2(item.amount) || "",
+        [col8]: value8,
+        [col9]: value9,
+      };
+    });
+  };
+
+  const getExportSourceRecords = () => {
+    if (exportAgentId) {
+      return (incomeHistory || [])
+        .filter((item) => item?.user?._id === exportAgentId)
+        .slice()
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    return filtered;
+  };
+
+  const buildExportFileBaseName = () => {
+    if (selectedAgent) {
+      const safeName = (selectedAgent.referralId !== "-" ? selectedAgent.referralId : selectedAgent.name)
+        .toString()
+        .trim()
+        .replace(/[^a-zA-Z0-9]+/g, "_");
+
+      return `Income-report-${safeName}`;
+    }
+
+    return "Income-report";
+  };
+
+  const formatIncomeType = (type) =>
+    (type || "")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase());
+
+  /* =====================================================
+     EXPORT EXCEL
+  ===================================================== */
+  const exportToExcel = () => {
+    const sourceRecords = getExportSourceRecords();
+    const rows = getExportRows(sourceRecords);
+
+    if (!rows.length) {
+      setAlert({ message: "No Income data to export", status: "Error" });
+      setTimeout(() => setAlert(null), 3000);
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+
+    const columnWidths = Object.keys(rows[0]).map((key) => {
+      const maxLength = Math.max(
+        key.length,
+        ...rows.map((row) => String(row[key] ?? "").length),
+      );
+      return { wch: Math.min(maxLength + 3, 40) };
+    });
+
+    worksheet["!cols"] = columnWidths;
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Income");
+
+    XLSX.writeFile(workbook, `${buildExportFileBaseName()}.xlsx`);
+
+    setAlert({ message: "Excel exported successfully", status: "Success" });
+    setTimeout(() => setAlert(null), 3000);
+    setExportOpen(false);
+  };
+
+  /* =====================================================
+     EXPORT PDF
+  ===================================================== */
+  /* =====================================================
+   EXPORT PDF
+===================================================== */
+  const exportToPDF = async () => {
+    const sourceRecords = getExportSourceRecords();
+    const rows = getExportRows(sourceRecords);
+
+    if (!rows.length) {
+      setAlert({ message: "No Income data to export", status: "Error" });
+      setTimeout(() => setAlert(null), 3000);
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const logoImg = await loadLogo(logo);
+    const LOGO_HEIGHT = 14; // mm
+    const RIGHT_MARGIN = 8; // same as the table margin
+
+    const drawLogo = () => {
+      if (!logoImg) return;
+      const w = LOGO_HEIGHT * logoImg.ratio; // keep the aspect ratio
+      const x = doc.internal.pageSize.getWidth() - RIGHT_MARGIN - w;
+      doc.addImage(logoImg.data, "PNG", x, 6, w, LOGO_HEIGHT);
+    };
+
+    doc.setFontSize(18);
+    doc.text(
+      selectedAgent
+        ? `Income Report - ${selectedAgent.name} (${selectedAgent.referralId})`
+        : "Income Report",
+      14,
+      15,
+    );
+
+    doc.setFontSize(9);
+    doc.text(`Total Records: ${rows.length}`, 14, 22);
+
+    const columns = Object.keys(rows[0]);
+    const body = rows.map((row) =>
+      columns.map((column) => {
+        const value = row[column] ?? "-";
+
+        // match how "Income Type" is shown in the on-screen table
+        if (column === "Income Type" && typeof value === "string") {
+          return formatIncomeType(value);
+        }
+
+        return value;
+      }),
+    );
+
+    // Relative proportions for each column - wider ones get more real width
+    const baseWidths = {
+      "S.No": 8,
+      "Date": 16,
+      "Name": 24,
+      "Phone": 18,
+      "Referral ID": 18,
+      "Income Type": 22,
+      "Amount": 16,
+      "From": 24,
+      "From Phone": 18,
+    };
+
+    const margin = { top: 27, left: 8, right: 8, bottom: 10 };
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const availableWidth = pageWidth - margin.left - margin.right;
+
+    const totalBase = columns.reduce(
+      (sum, col) => sum + (baseWidths[col] || 18),
+      0,
+    );
+
+    const scale = availableWidth / totalBase;
+
+    const columnStyles = {};
+    columns.forEach((column, index) => {
+      const base = baseWidths[column] || 18;
+      columnStyles[index] = {
+        cellWidth: base * scale,
+      };
+    });
+
+    autoTable(doc, {
+      head: [columns],
+      body,
+      startY: margin.top,
+      theme: "grid",
+      tableWidth: "auto",
+      styles: {
+        fontSize: 9,           // bumped up from 6
+        cellPadding: 2.2,       // bumped up from 1
+        overflow: "linebreak",
+        valign: "middle",
+        halign: "left",
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fontSize: 9.5,
+        fontStyle: "bold",
+        valign: "middle",
+        fillColor: [30, 30, 30],
+      },
+      bodyStyles: { valign: "middle" },
+      columnStyles,
+      margin,
+      didDrawPage: drawLogo,
+    });
+
+    doc.save(`${buildExportFileBaseName()}.pdf`);
+
+    setAlert({ message: "PDF exported successfully", status: "Success" });
+    setTimeout(() => setAlert(null), 3000);
+    setExportOpen(false);
+  };
+
+  const closeExportModal = () => {
+    setExportOpen(false);
+    setExportAgentId("");
+  };
+
+  const now = new Date();
+
+  // Today's Collection
+  const todaysCollection = incomeHistory
+    ?.filter((p) => {
+      const date = new Date(p.paymentDate || p.createdAt);
+
+      return (
+        date.getDate() === now.getDate() &&
+        date.getMonth() === now.getMonth() &&
+        date.getFullYear() === now.getFullYear() &&
+        p.status === "approved"
+      );
+    })
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+  const getIncomeCycle = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = date.getDate();
+
+    if (day <= 15) {
+      return {
+        cycleStart: new Date(year, month, 1, 0, 0, 0, 0),
+        cycleEnd: new Date(year, month, 15, 23, 59, 59, 999),
+      };
+    }
+
+    const lastDay = new Date(year, month + 1, 0).getDate(); // last day of this month
+    return {
+      cycleStart: new Date(year, month, 16, 0, 0, 0, 0),
+      cycleEnd: new Date(year, month, lastDay, 23, 59, 59, 999),
+    };
+  };
+
+  // Previous cycle = the 15-day window immediately before the current one
+  const getPreviousIncomeCycle = (date = new Date()) => {
+    const { cycleStart } = getIncomeCycle(date);
+    // Step back 1 day from the current cycle's start to land in the previous cycle
+    const prevAnchor = new Date(cycleStart);
+    prevAnchor.setDate(prevAnchor.getDate() - 1);
+    return getIncomeCycle(prevAnchor);
+  };
+
+  const { cycleStart: currentCycleStart, cycleEnd: currentCycleEnd } =
+    useMemo(() => getIncomeCycle(now), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { cycleStart: prevCycleStart, cycleEnd: prevCycleEnd } =
+    useMemo(() => getPreviousIncomeCycle(now), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const currentCycleIncome =
+    incomeHistory
+      ?.filter((i) => {
+        const d = new Date(i.createdAt);
+        return (
+          i.type !== "referal_income" &&
+          d >= currentCycleStart &&
+          d <= currentCycleEnd
+        );
+      })
+      ?.reduce((acc, item) => acc + (item.amount || 0), 0) || 0;
+
+  const previousCycleIncome =
+    incomeHistory
+      ?.filter((i) => {
+        const d = new Date(i.createdAt);
+        return (
+          i.type !== "referal_income" &&
+          d >= prevCycleStart &&
+          d <= prevCycleEnd
+        );
+      })
+      ?.reduce((acc, item) => acc + (item.amount || 0), 0) || 0;
+
+  // Human-readable labels for the card titles, e.g. "16 Sep - 30 Sep"
+  const formatCycleLabel = (start, end) => {
+    const opts = { day: "2-digit", month: "short" };
+    return `${start.toLocaleDateString("en-IN", opts)} - ${end.toLocaleDateString("en-IN", opts)}`;
+  };
+
+  const currentCycleLabel = formatCycleLabel(currentCycleStart, currentCycleEnd);
+  const previousCycleLabel = formatCycleLabel(prevCycleStart, prevCycleEnd);
+  console.log(selectedIncome, "selectedIncome")
   return (
     <div className="plot-container">
-      {/* <div className="table-filters">
+      <div className="table-filters">
         <div className="page-head-title">
           <h2>Income</h2>
           <Breadcrumb />
         </div>
-      </div> */}
+      </div>
       <div className="dashboard-container">
         <div className="dashboard-wrapper">
           {/* ================= STATS ================= */}
           <div className="dashboard-grid">
             <DashboardCard
+              title="Total Team Business"
+              value={`₹${formatCurrency(userDetail?.totalBusiness || 0)}`}
+              icons={<NiPayments />}
+            />
+            <DashboardCard
               title="Total Income"
               value={`₹${formatCurrency(totalIncome)}`}
               icons={<NiPayments />}
             />
-
             <DashboardCard
-              title="Credited Income"
-              value={`₹${formatCurrency(creditedIncome)}`}
+              title={`My Wallet (${mood === "admin" ? "Admin" : mood === "agent" ? "Associate" : mood === "staff" ? "Staff" : "User"})`}
+              value={`₹${formatCurrency(currentUser?.incomeSummary?.payableAmount || 0)}`}
               icons={<NiPayments />}
             />
-
             <DashboardCard
-              title="Pending Income"
-              value={`₹${formatCurrency(pendingIncome)}`}
+              title="Plot's Income"
+              value={`₹${formatCurrency(otherIncome || 0)}`}
               icons={<NiPayments />}
             />
-
             <DashboardCard
-              title="Today's Income"
-              value={`₹${formatCurrency(todayIncome)}`}
+              title="Total Referral Income"
+              value={`₹${formatCurrency(referralIncome || 0)}`}
               icons={<NiPayments />}
             />
-
+            <DashboardCard
+              title="Total Self Business"
+              value={`₹${formatCurrency(userDetail?.selfBusiness || 0)}`}
+              icons={<NiPayments />}
+            />
+            <DashboardCard
+              title="Today's Collection"
+              value={`₹${formatCurrency(todaysCollection)}`}
+              icons={<NiPayments />}
+            />
             <DashboardCard
               title="Total Transactions"
               value={incomeHistory?.length || 0}
               icons={<NiPayments />}
             />
-
             <DashboardCard
-              title="My Wallet"
-              value={`₹${formatCurrency(userDetail?.wallet || 0)}`}
+              title={`Previous Cycle Income (${previousCycleLabel})`}
+              value={`₹${formatCurrency(previousCycleIncome)}`}
+              icons={<NiPayments />}
+            />
+            <DashboardCard
+              title={`Current Cycle Income (${currentCycleLabel})`}
+              value={`₹${formatCurrency(currentCycleIncome)}`}
               icons={<NiPayments />}
             />
           </div>
-          <h4 style={{ margin: "1rem 0" }}>Income History</h4>
+          <h4>Income History</h4>
           <div className="filter-grid page-tools table-filters">
             {/* SEARCH */}
             <div className="searchItem">
@@ -160,7 +646,39 @@ const Income = ({ mood, setAlert }) => {
             </div>
 
             {/* DESIGNATION FILTER */}
-            <div className="searchItem">
+            <CustomSelect
+              className="cs-filter"
+              value={statusFilter}
+              onChange={(v) => {
+                setStatusFilter(v);
+                setPage(1);
+              }}
+              placeholder="All Status"
+              options={[
+                { value: "", label: "All Status" },
+                ...STATUS_OPTIONS.map((s) => ({
+                  value: s,
+                  label: s.charAt(0).toUpperCase() + s.slice(1),
+                })),
+              ]}
+            />
+            <CustomSelect
+              className="cs-filter"
+              value={designationFilter}
+              onChange={(v) => {
+                setDesignationFilter(v);
+                setPage(1);
+              }}
+              placeholder="All Designations"
+              options={[
+                { value: "", label: "All Designations" },
+                ...DESIGNATION_OPTIONS.map((s) => ({
+                  value: s,
+                  label: s.charAt(0).toUpperCase() + s.slice(1),
+                })),
+              ]}
+            />
+            {/* <div className="searchItem">
               <select
                 value={designationFilter}
                 onChange={(e) => {
@@ -214,10 +732,10 @@ const Income = ({ mood, setAlert }) => {
 
                 <option value="Executive Director">Executive Director</option>
               </select>
-            </div>
+            </div> */}
 
             {/* STATUS FILTER */}
-            <div className="searchItem">
+            {/* <div className="searchItem">
               <select
                 value={statusFilter}
                 onChange={(e) => {
@@ -233,7 +751,7 @@ const Income = ({ mood, setAlert }) => {
 
                 <option value="failed">Failed</option>
               </select>
-            </div>
+            </div> */}
             <div className="searchItem">
               <label>From</label>
               <input
@@ -257,6 +775,31 @@ const Income = ({ mood, setAlert }) => {
                 }}
               />
             </div>
+            <button className="add-button" onClick={() => setExportOpen(true)}>
+              <Download size={18} />
+              Export
+            </button>
+          </div>
+          <div className="income-tabs">
+            <button
+              className={tabActive === "referral" ? "active" : ""}
+              onClick={() => {
+                setTabActive("referral");
+                setPage(1);
+              }}
+            >
+              Referral Income
+            </button>
+
+            <button
+              className={tabActive === "other" ? "active" : ""}
+              onClick={() => {
+                setTabActive("other");
+                setPage(1);
+              }}
+            >
+              Other Income
+            </button>
           </div>
           {mood === "admin" ? (
             <div className="card table-box">
@@ -267,7 +810,6 @@ const Income = ({ mood, setAlert }) => {
                   <span>Name</span>
                   <span>Income Type</span>
                   <span>Amount</span>
-                  <span>Company</span>
                   <span>From</span>
                   <span>Status</span>
                   <span>Action</span>
@@ -280,28 +822,42 @@ const Income = ({ mood, setAlert }) => {
                 ) : (
                   paginated?.map((item, index) => (
                     <div className="table-row" key={item._id}>
-                      <span>{index + 1}</span>
+                      <span>{(page - 1) * ITEMS_PER_PAGE + index + 1}</span>
                       <span>{formatDate(item.createdAt)}</span>
-                      <span>
-                        {item.user?.name} ({item.user?.referralId})
-                      </span>
+                      <span>{item.user?.name} ({item.user?.referralId})</span>
                       <span>
                         {item.type
                           ?.replace(/_/g, " ")
                           .replace(/\b\w/g, (l) => l.toUpperCase())}
                       </span>
                       <span>₹{formatCurrency(item.amount)}</span>
-                      <span>{item?.payment?.booking?.colony?.category || "-"}</span>
-                      <span>
-                        {item?.type !== "referal_income"
-                          ? `${item?.payment?.customer?.name} (${item?.payment?.customer?.referralId})` ||
-                            "-"
-                          : `${item?.fromUser?.name} (${item?.fromUser?.referralId})`}
-                      </span>
+                      {tabActive === "other" ?
+                        <span>{item?.payment?.booking?.plot?.plotNumber},{item?.payment?.booking?.colony?.name} {""}{tabActive === "other" ? <span
+                          className={`status ${item?.payment?.booking?.colony?.category === "Anokhi Homes"
+                            ? "active"
+                            : "pending2"
+                            }`}
+                        >
+                          {item?.payment?.booking?.colony?.category === "Anokhi Homes"
+                            ? "AH"
+                            : "PP"}
+                        </span> : ""}</span> :
+                        <span>{!item?.fromUser ?
+                          `${item?.payment?.customer?.name ? item?.payment?.customer?.name : "Anokhi Homes"} (Payment)` || "-" :
+                          `${item?.fromUser?.name} (${item?.fromUser?.referralId})`} {""}{tabActive === "other" ? <span
+                            className={`status ${item?.payment?.booking?.colony?.category === "Anokhi Homes"
+                              ? "active"
+                              : "pending2"
+                              }`}
+                          >
+                            {item?.payment?.booking?.colony?.category === "Anokhi Homes"
+                              ? "AH"
+                              : "PP"}
+                          </span> : ""}</span>
+                      }
                       <span
-                        className={`status ${
-                          item.status === "credited" ? "active" : "pending"
-                        }`}
+                        className={`status ${item.status === "credited" ? "active" : "pending"
+                          }`}
                       >
                         {item.status}
                       </span>
@@ -335,28 +891,7 @@ const Income = ({ mood, setAlert }) => {
               )}
             </div>
           )}
-          <div className="pagination">
-            <button disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-              Prev
-            </button>
-
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <button
-                key={i}
-                className={page === i + 1 ? "active" : ""}
-                onClick={() => setPage(i + 1)}
-              >
-                {i + 1}
-              </button>
-            ))}
-
-            <button
-              disabled={page === totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </button>
-          </div>
+          <Pagination page={page} totalPages={totalPages} setPage={setPage} />
         </div>
         <ViewModal
           open={viewOpen}
@@ -366,7 +901,7 @@ const Income = ({ mood, setAlert }) => {
           }}
           title={selectedIncome?.type}
         >
-          {selectedIncome && (
+          {selectedIncome &&
             <>
               <div className="user-card-bottom view-box">
                 <div className="user-card-bottom-left">
@@ -376,21 +911,19 @@ const Income = ({ mood, setAlert }) => {
                 </div>
                 <div className="user-card-bottom-right">
                   <p>{formatDate(selectedIncome?.createdAt)}</p>
-                  <p style={{ textTransform: "capitalize" }}>
-                    {selectedIncome?.type}
-                  </p>
+                  <p style={{ textTransform: "capitalize" }}>{selectedIncome?.type}</p>
                   <p>₹{formatCurrency(selectedIncome.amount)}</p>
                 </div>
               </div>
               <div className={`report-view-box-right active`}>
                 <div className="payment-details">
+
                   {selectedIncome?.type !== "referal_income" && (
                     <>
                       <h5>Payment Details</h5>
 
                       <p>
-                        <strong>Name:</strong>{" "}
-                        {selectedIncome?.payment?.customer?.name || "-"}
+                        <strong>Name:</strong> {selectedIncome?.payment?.customer?.name || "-"}
                       </p>
 
                       <p>
@@ -403,14 +936,13 @@ const Income = ({ mood, setAlert }) => {
                         {selectedIncome?.payment?.customer?.email || "-"}
                       </p>
                       <p>
-                        <strong>Amount:</strong> ₹
-                        {formatCurrency(selectedIncome?.payment?.amount || 0)}
+                        <strong>Amount:</strong> ₹{formatCurrency(selectedIncome?.payment?.amount || 0)}
                       </p>
-                      <p>
+                      <p style={{ textTransform: "capitalize" }}>
                         <strong>Payment Mode:</strong>{" "}
                         {selectedIncome?.payment?.paymentMode || "N/A"}
                       </p>
-                      <p>
+                      <p style={{ textTransform: "capitalize" }}>
                         <strong>Payment Type:</strong>{" "}
                         {selectedIncome?.payment?.paymentType || "N/A"}
                       </p>
@@ -437,19 +969,18 @@ const Income = ({ mood, setAlert }) => {
                       <hr />
 
                       <p>
-                        <strong>Business Amount:</strong> ₹
-                        {formatCurrency(selectedIncome?.businessAmount || 0)}
+                        <strong>Business Amount:</strong> ₹{formatCurrency(selectedIncome?.businessAmount || 0)}
                       </p>
 
                       <p>
-                        <strong>Income %:</strong>{" "}
-                        {selectedIncome?.percentage || 0}%
+                        <strong>Income %:</strong> {selectedIncome?.percentage || 0}%
                       </p>
-
                       <p>
-                        <strong>Income Earned:</strong> ₹
-                        {formatCurrency(selectedIncome?.amount || 0)}
+                        <strong>Income Earned:</strong> ₹{formatCurrency(selectedIncome?.amount || 0)}
                       </p>
+                      {selectedIncome?.remark ? (
+                        <p className="slab-note">{selectedIncome.remark}</p>
+                      ) : null}
                     </>
                   )}
 
@@ -462,23 +993,19 @@ const Income = ({ mood, setAlert }) => {
                       </p>
 
                       <p>
-                        <strong>Designation:</strong>{" "}
-                        {selectedIncome?.fromUser?.designation}
+                        <strong>Designation:</strong> {selectedIncome?.fromUser?.designation}
                       </p>
 
                       <p>
-                        <strong>Email:</strong>{" "}
-                        {selectedIncome?.fromUser?.email}
+                        <strong>Email:</strong> {selectedIncome?.fromUser?.email}
                       </p>
 
                       <p>
-                        <strong>Phone:</strong>{" "}
-                        {selectedIncome?.fromUser?.phone}
+                        <strong>Phone:</strong> {selectedIncome?.fromUser?.phone}
                       </p>
 
                       <p>
-                        <strong>Referral ID:</strong>{" "}
-                        {selectedIncome?.fromUser?.referralId}
+                        <strong>Referral ID:</strong> {selectedIncome?.fromUser?.referralId}
                       </p>
 
                       {/* <hr /> */}
@@ -490,8 +1017,7 @@ const Income = ({ mood, setAlert }) => {
                       </p>
 
                       <p>
-                        <strong>Designation:</strong>{" "}
-                        {selectedIncome?.user?.designation}
+                        <strong>Designation:</strong> {selectedIncome?.user?.designation}
                       </p>
 
                       <p>
@@ -503,8 +1029,7 @@ const Income = ({ mood, setAlert }) => {
                       </p>
 
                       <p>
-                        <strong>Referral ID:</strong>{" "}
-                        {selectedIncome?.user?.referralId}
+                        <strong>Referral ID:</strong> {selectedIncome?.user?.referralId}
                       </p>
 
                       {selectedIncome?.level && (
@@ -516,9 +1041,70 @@ const Income = ({ mood, setAlert }) => {
                   )}
                 </div>
               </div>
-            </>
-          )}
+            </>}
         </ViewModal>
+        <AddLocationModal
+          open={exportOpen}
+          onClose={closeExportModal}
+          title="Export Income Report"
+        >
+          <div className="export-modal-body">
+            <div className="searchItem" style={{ marginBottom: "1rem" }}>
+              <label>Agent</label>
+              <select
+                value={exportAgentId}
+                onChange={(e) => setExportAgentId(e.target.value)}
+              >
+                <option value="">All (current table filters)</option>
+                {agentOptions.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name} ({agent.referralId})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <p style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
+              {selectedAgent
+                ? `This will export the complete income history for ${selectedAgent.name} (${selectedAgent.referralId}), regardless of the search, status, date or tab filters currently applied to the table.`
+                : "This will export whatever is currently shown by the table's search, status, date and tab filters."}
+            </p>
+
+            <div className="export-fields">
+              <p>Export includes:</p>
+              {tabActive === "other" ?
+                EXPORT_COLUMNS2.map((col) => (
+                  <span key={col}>{col}</span>
+                )) : EXPORT_COLUMNS.map((col) => (
+                  <span key={col}>{col}</span>
+                ))
+              }
+              { }
+            </div>
+          </div>
+
+          <div className="modal-actions" style={{ marginTop: "1rem" }}>
+            <button
+              type="button"
+              className="export-excel-btn"
+              disabled={saving}
+              onClick={exportToExcel}
+            >
+              <FileSpreadsheet size={18} />
+              Excel
+            </button>
+
+            <button
+              type="button"
+              className="export-pdf-btn"
+              disabled={saving}
+              onClick={exportToPDF}
+            >
+              <FileText size={18} />
+              PDF
+            </button>
+          </div>
+        </AddLocationModal>
       </div>
     </div>
   );

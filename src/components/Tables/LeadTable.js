@@ -365,7 +365,7 @@ const LeadTable = ({
     return text?.toLowerCase().includes("accepted by");
   };
 
-  // console.log(item, "item")
+  console.log(item, "item")
   // console.log(selectedProjects, "allCoselectedProjectslonies")
   return (
     <div>
@@ -374,7 +374,7 @@ const LeadTable = ({
         <span>{formatDate(item.createdAt)}</span>
         <span>{item.name}</span>
         <span>{item.phone}</span>
-        <span>{item.agent?.name || "-"}</span>
+        
         <span className="dots">
           {(mood === "admin" || mood === "staff") &&
             (item?.status === "new" ? (
@@ -420,6 +420,7 @@ const LeadTable = ({
             </div>
           )}
         </span>
+        <span>{item.agent?.name || "-"} ({item.agent?.referralId || "-"})</span>
         <span>
           <span
             className={`status ${
