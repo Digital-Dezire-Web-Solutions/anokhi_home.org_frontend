@@ -95,6 +95,8 @@ const PlotModal = ({
     onClose();
   };
 
+  console.log(plot.plotType, "plot.plotType");
+  console.log(mood, "mood");
   return (
     <div className="modal-bg plot-modal" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -104,7 +106,7 @@ const PlotModal = ({
 
         {isAdmin ? (
           <>
-            <div className="field">
+            {/* <div className="field">
               <label>Plot ID</label>
               <input
                 value={plot.plotId || ""}
@@ -114,7 +116,7 @@ const PlotModal = ({
                   })
                 }
               />
-            </div>
+            </div> */}
 
             <div className="field">
               <label>Plot Number</label>
@@ -221,7 +223,6 @@ const PlotModal = ({
                     />
                   </div>
                 </div>
-                {/* PLC */}
                 <div className="field">
                   <label>PLC (Preferred Location Charge)</label>
 
@@ -254,10 +255,10 @@ const PlotModal = ({
 
             {/* USER / AGENT VIEW */}
 
-            <div className="user-field">
+            {/* <div className="user-field">
               <label>Plot ID</label>
               <div className="value">{plot.plotId || "-"}</div>
-            </div>
+            </div> */}
 
             <div className="user-field">
               <label>Plot Number</label>
@@ -297,6 +298,14 @@ const PlotModal = ({
                       </div>
                     </>
                   )}
+                {plot.plc && (
+                  <div className="user-field">
+                    <label>PLC</label>
+                    <div className="value">
+                      Applicable (5–10% on total price)
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </>

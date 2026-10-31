@@ -222,8 +222,8 @@ const PlotList = ({ mood, setAlert }) => {
     <div className="plot-container">
       <div className="table-filters">
         <div className="page-head-title">
-          {/* <h2>Trending Locations</h2> */}
-          {/* <Breadcrumb /> */}
+          <h2>Trending Locations</h2>
+          <Breadcrumb />
         </div>
         <div className="page-tools">
           <div className="searchItem">

@@ -11,7 +11,7 @@
 .admin-panel button,
 .admin-panel select {
   padding: 6px 14px;
-  border-radius: 12px;
+  border-radius: 20px;
   border: none;
   background: transparent;
   color: #9f9f9f;
@@ -30,7 +30,7 @@
   color: white;
   border: 1px solid var(--mood-color);
   padding: 6px 14px;
-  border-radius: 12px;
+  border-radius: 20px;
   cursor: pointer;
 }
 
@@ -45,12 +45,11 @@
 }
 
 .modal {
-  background: var(--secondary-color);
+  background: #fff;
   padding: 1.5rem;
-  border-radius: 12px;
+  border-radius: 1.75rem;
   position: relative;
   min-width: 30%;
-  max-width: 60%;
 }
 .modal h3 {
   margin: 0;
@@ -60,7 +59,7 @@
 }
 
 .plot-draw {
-  background-color: var(--secondary-color);
+  background-color: #fff;
   position: relative;
 }
 
@@ -87,15 +86,15 @@
   right: 2%;
   z-index: 5;
   border: 1px solid #9f9f9f;
-  border-radius: 12px;
-  padding: 10px;
+  border-radius: 1.75rem;
+  padding: 1rem;
   display: flex;
   align-items: center;
   flex-direction: column;
   gap: 5px;
 }
 .plot-colors span {
-  border-radius: 8px;
+  border-radius: 1.75rem;
   padding: 5px 10px;
   width: 100%;
   display: flex;
@@ -143,16 +142,16 @@
   /* width: 100%; */
   padding: 10px;
   margin: 0 0 8px 0;
-  border-radius: 12px;
+  border-radius: 20px;
   border: 1px solid #bcbcbc2e;
   background-color: transparent;
-  color: #9f9f9f;
+  color: black;
 }
 
 .modal-actions button {
   width: 100%;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: 20px;
   border: none;
   background: var(--mood-color);
   color: white;
@@ -163,6 +162,20 @@
   justify-content: center;
   gap: 5px;
 }
+/* .modal-actions button:disabled {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 20px;
+  border: none;
+  background: gray !important;
+  color: black !important;
+  cursor: pointer;
+  border: 1px solid var(--mood-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+} */
 
 .modal-actions {
   display: flex;
@@ -236,7 +249,7 @@
 .plot-buttons .upload-btn,
 .plot-buttons .fullscreen-tools button {
   padding: 6px 14px;
-  border-radius: 12px;
+  border-radius: 20px;
   border: none;
   background: transparent;
   color: #9f9f9f;
@@ -265,7 +278,6 @@
 @media (max-width: 768px) {
   .modal {
     min-width: 90%;
-    max-width: 90%;
   }
   .plot-draw.card {
     padding: 0;

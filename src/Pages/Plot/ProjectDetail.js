@@ -8,9 +8,10 @@ import { polygonArea } from "../../components/PlotDraw/geometry";
 import { TOOLS } from "../../components/PlotDraw/Tools";
 import Breadcrumb from "../../components/Breadcrumb/Breadcrumb";
 import { ChevronLeft } from "lucide-react";
-import PlotDrawCard from "../../components/Cards/PlotDrawCard";
+// import PlotDrawCard from "../../components/Cards/PlotDrawCard";
 import { useDispatch, useSelector } from "react-redux";
 import { getPlots } from "../../Redux/Slices/AppSlices";
+import PlotDrawCard from "../../components/plot-draw-xyflow/Cards/PlotDrawCard";
 
 const ProjectDetail = ({ mood, setAlert }) => {
   const location = useLocation();
@@ -18,9 +19,9 @@ const ProjectDetail = ({ mood, setAlert }) => {
   const projectData = location;
   const projectName = projectData?.state?.project?.name;
   const navigate = useNavigate();
-  const  projectId  = projectData?.state?.project?._id;
-// console.log(projectData,"projectData")
-console.log(projectId,"projectId")
+  const projectId = projectData?.state?.project?._id;
+  // console.log(projectData,"projectData")
+  console.log(projectId, "projectId");
   const dispatch = useDispatch();
   const { plots } = useSelector((state) => state.app);
 
@@ -32,7 +33,7 @@ console.log(projectId,"projectId")
   // console.log(plots,"plots")
 
   if (!plots) return <p>Project not found</p>;
-
+  console.log(mood, "mood");
   return (
     <div className="plot-container product-detail">
       <div className="table-filters">
@@ -41,10 +42,16 @@ console.log(projectId,"projectId")
             <ChevronLeft className="back-button" onClick={() => navigate(-1)} />
             <h2>{projectName}</h2>
           </div>
-          {/* <Breadcrumb /> */}
+          <Breadcrumb />
         </div>
       </div>
-      <PlotDrawCard data={plots} mood={mood} setAlert={setAlert} projectId={projectId}/>
+      {/* <PlotDrawCard data={plots} mood={mood} setAlert={setAlert} projectId={projectId}/> */}
+      <PlotDrawCard
+        data={plots}
+        mood={mood}
+        setAlert={setAlert}
+        projectId={projectId}
+      />
     </div>
   );
 };

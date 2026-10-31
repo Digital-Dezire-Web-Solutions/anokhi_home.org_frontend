@@ -173,9 +173,17 @@
 .dashboard-head,
 .dashboard-row {
   display: grid;
-  grid-template-columns: 40px 100px 1fr 1.5fr 1fr 100px 120px 120px 100px 60px;
+  grid-template-columns: 40px 100px 1fr 1.5fr 1fr 100px 120px 120px 100px 150px;
   align-items: center;
-  padding: 12px 0;
+  /* padding: 12px 0; */
+  border-bottom: 1px solid #e3e2e2;
+}
+
+.dashboard-head span,
+.dashboard-row span {
+  border-right: 1px solid #e3e2e2;
+  padding: 12px 10px;
+  text-transform: capitalize;
 }
 
 .dashboard-box-left .dashboard-box-item .dashboard-box-item-left h4 {

@@ -13,6 +13,9 @@ import { getCashback, getProjects } from "../../Redux/Slices/AppSlices";
 import Host from "../../Host/Host";
 import axios from "axios";
 import { uploadImage } from "../LandingSetting/LandingApi";
+import ColonyPlots from "../ColonyPlots/ColonyPlots";
+import NiList from "../../icons/ni-list";
+import NiCard from "../../icons/ni-card";
 
 const Projects = ({ mood, setAlert }) => {
   const location = useLocation();
@@ -39,6 +42,7 @@ const Projects = ({ mood, setAlert }) => {
     priceRange: "",
     category: "",
   });
+  const [viewItem, setViewItem] = useState(false);
 
   useEffect(() => {
     if (selectedProject) {
@@ -98,8 +102,8 @@ const Projects = ({ mood, setAlert }) => {
         name: formData.name,
         image: imageUrl,
         area: formData.area,
-        category: formData.category,
         priceRange: formData.priceRange,
+        category: formData.category,
         locationId: plotId,
       };
 
@@ -123,8 +127,8 @@ const Projects = ({ mood, setAlert }) => {
         name: "",
         image: "",
         area: "",
-        category: "",
         priceRange: "",
+        category: "",
       });
       setTimeout(() => setAlert(null), 3000);
       setSaving(false);
@@ -157,8 +161,8 @@ const Projects = ({ mood, setAlert }) => {
         name: formData.name,
         image: imageUrl,
         area: formData.area,
-        category: formData.category,
         priceRange: formData.priceRange,
+        category: formData.category,
       };
 
       await axios.put(
@@ -237,7 +241,7 @@ const Projects = ({ mood, setAlert }) => {
             <ChevronLeft className="back-button" onClick={() => navigate(-1)} />
             <h2>{plotData?.name} Projects</h2>
           </div>
-          {/* <Breadcrumb /> */}
+          <Breadcrumb />
         </div>
         <div className="page-tools">
           <div className="searchItem">
@@ -255,59 +259,77 @@ const Projects = ({ mood, setAlert }) => {
               <LucidePlus /> Add
             </button>
           )}
+           <div className="page-toggle">
+            <span
+              className={`${viewItem === false ? "active" : ""}`}
+              onClick={() => setViewItem(false)}
+            >
+              <NiCard />
+            </span>
+            <span
+              className={`${viewItem === true ? "active" : ""}`}
+              onClick={() => setViewItem(true)}
+            >
+              <NiList />
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="plot-grid ">
-        {projects?.length === 0 ? (
-          <div className="no-data">
-            <p>No Colony Found</p>
-          </div>
-        ) : (
-          projects
+      {viewItem === false ? (
+        <div className="plot-grid ">
+          {projects?.length === 0 ? (
+            <div className="no-data">
+              <p>No Colony Found</p>
+            </div>
+          ) : (
+            projects
 
-            ?.filter((p) =>
-              p?.name?.toLowerCase().includes(search?.toLowerCase() || ""),
-            )
+              ?.filter((p) =>
+                p?.name?.toLowerCase().includes(search?.toLowerCase() || ""),
+              )
 
-            .map((p) => {
-              const cashback = cashbackData?.find(
-                (c) => c.colonyId?._id === p._id,
-              );
+              .map((p) => {
+                const cashback = cashbackData?.find(
+                  (c) => c.colonyId?._id === p._id,
+                );
 
-              return (
-                <PlotCard
-                  key={p._id}
-                  p={p}
-                  cashback={cashback}
-                  mood={mood}
-                  setSelectedProject={setSelectedProject}
-                  setIsEditMode={setIsEditMode}
-                  setOpen={setOpen}
-                  setAlert={setAlert}
-                  onDelete={handleDeleteProject}
-                  plotData={plotData}
-                  saving={saving}
-                />
-              );
-            })
-          // ?.filter((p) =>
-          //   p?.name?.toLowerCase().includes(search?.toLowerCase() || ""),
-          // )
-          // .map((p) => (
-          //   <PlotCard
-          //     p={p}
-          //     plotId={plotId}
-          //     mood={mood}
-          //     setSelectedProject={setSelectedProject}
-          //     setIsEditMode={setIsEditMode}
-          //     setOpen={setOpen}
-          //     setAlert={setAlert}
-          //     onDelete={handleDeleteProject}
-          //   />
-          // ))
-        )}
-      </div>
+                return (
+                  <PlotCard
+                    key={p._id}
+                    p={p}
+                    cashback={cashback}
+                    mood={mood}
+                    setSelectedProject={setSelectedProject}
+                    setIsEditMode={setIsEditMode}
+                    setOpen={setOpen}
+                    setAlert={setAlert}
+                    onDelete={handleDeleteProject}
+                    plotData={plotData}
+                    saving={saving}
+                  />
+                );
+              })
+            // ?.filter((p) =>
+            //   p?.name?.toLowerCase().includes(search?.toLowerCase() || ""),
+            // )
+            // .map((p) => (
+            //   <PlotCard
+            //     p={p}
+            //     plotId={plotId}
+            //     mood={mood}
+            //     setSelectedProject={setSelectedProject}
+            //     setIsEditMode={setIsEditMode}
+            //     setOpen={setOpen}
+            //     setAlert={setAlert}
+            //     onDelete={handleDeleteProject}
+            //   />
+            // ))
+          )}
+        </div>
+      ) : (
+        <ColonyPlots setAlert={setAlert}/>
+      )}
 
       {/* ADD PLOT MODAL */}
       <AddLocationModal
@@ -322,7 +344,6 @@ const Projects = ({ mood, setAlert }) => {
             image: "",
             area: "",
             priceRange: "",
-            category: "",
           });
         }}
         title={isEditMode ? "Edit Project" : "Add Project"}
@@ -359,6 +380,20 @@ const Projects = ({ mood, setAlert }) => {
           />
         </div>
 
+        {/* <div className="field">
+          <label>Image</label>
+
+          <input
+            value={formData.image}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                image: e.target.value,
+              })
+            }
+            placeholder="Image"
+          />
+        </div> */}
         <div className="field">
           <label>Image</label>
 

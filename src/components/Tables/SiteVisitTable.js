@@ -429,7 +429,7 @@ const SiteVisitTable = ({
           )}
         </span>
         <span>
-          {item.colonies?.length}, {item?.location?.name} :- {item.visitDate}
+          {item.colonies?.length}, {item?.location?.name} :- {item.visitDate} , {item?.visiters || 0} Person
         </span>
         <span
           className={`status ${item.status === "completed" ? "active" : item.status === "scheduled" ? "pending" : item.status === "rescheduled" ? "pending" : item.status === "approval" ? "pending2" : "failed"}`}
@@ -660,6 +660,7 @@ const SiteVisitTable = ({
             {mood !== "agent" && <p>Associate</p>}
             <p>Site</p>
             <p>Visit Date</p>
+            <p>No. of Persons</p>
             {/* <p>Notes</p> */}
           </div>
           <div className="user-card-bottom-right">
@@ -674,6 +675,7 @@ const SiteVisitTable = ({
               , {item?.location?.name}
             </p>
             <p>{item.visitDate}</p>
+            <p>{item?.visiters || 0}</p>
             <div className="table-filters">
               <button
                 className={`view-report-btn ${showReport ? "active" : ""}`}

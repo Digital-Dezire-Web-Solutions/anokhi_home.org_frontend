@@ -319,6 +319,7 @@ const LeadTable = ({
         agent: item.agent._id,
         location: selectedColonies[0]?.locationId?._id,
         colonies: selectedColonies.map((c) => c._id),
+        visiters: formData.visiters,
         visitDate:
           formData.visitHour +
           " " +
@@ -365,7 +366,7 @@ const LeadTable = ({
     return text?.toLowerCase().includes("accepted by");
   };
 
-  console.log(item, "item")
+  console.log(item, "item");
   // console.log(selectedProjects, "allCoselectedProjectslonies")
   return (
     <div>
@@ -374,7 +375,7 @@ const LeadTable = ({
         <span>{formatDate(item.createdAt)}</span>
         <span>{item.name}</span>
         <span>{item.phone}</span>
-        
+
         <span className="dots">
           {(mood === "admin" || mood === "staff") &&
             (item?.status === "new" ? (
@@ -420,7 +421,9 @@ const LeadTable = ({
             </div>
           )}
         </span>
-        <span>{item.agent?.name || "-"} ({item.agent?.referralId || "-"})</span>
+        <span>
+          {item.agent?.name || "-"} ({item.agent?.referralId || "-"})
+        </span>
         <span>
           <span
             className={`status ${
@@ -867,6 +870,22 @@ const LeadTable = ({
                   <option value="">Select Period (AM / PM)</option>
                   <option value="AM">AM</option>
                   <option value="PM">PM</option>
+                </select>
+                <select
+                  value={formData.visiters || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, visiters: e.target.value })
+                  }
+                >
+                  <option value="">No. of Visiters</option>
+                  {[...Array(10)].map((_, i) => {
+                    const hour = i + 1;
+                    return (
+                      <option key={hour} value={hour}>
+                        {hour}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div className="field">

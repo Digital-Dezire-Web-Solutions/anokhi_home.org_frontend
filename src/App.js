@@ -52,6 +52,10 @@ import Expense from "./Pages/Expense/Expense";
 import Accounts from "./Pages/Accounts/Accounts";
 import Payout from "./Pages/Payout/Payout";
 import MyCustomers from "./Pages/Other/MyCustomers";
+import PlotTransfer from "./Pages/Transfer/PlotTransfer";
+import PaymentTransfer from "./Pages/Transfer/PaymentTransfer";
+import AgentTransfer from "./Pages/Transfer/AgentTransfer";
+import ColonyPlots from "./Pages/ColonyPlots/ColonyPlots";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -224,7 +228,9 @@ function App() {
                       />
                       <Route
                         path="/customer"
-                        element={<MyCustomers mood={mood} setAlert={setAlert} />}
+                        element={
+                          <MyCustomers mood={mood} setAlert={setAlert} />
+                        }
                       />
                       <Route
                         path="/teams"
@@ -293,6 +299,12 @@ function App() {
                         }
                       />
                       <Route
+                        path="/colony-plots"
+                        element={
+                          <ColonyPlots mood={mood} setAlert={setAlert} />
+                        }
+                      />
+                      <Route
                         path="/holdplot"
                         element={<HoldPlot mood={mood} setAlert={setAlert} />}
                       />
@@ -311,6 +323,24 @@ function App() {
                       <Route
                         path="/payout"
                         element={<Payout mood={mood} setAlert={setAlert} />}
+                      />
+                      <Route
+                        path="/plot-transfer"
+                        element={
+                          <PlotTransfer mood={mood} setAlert={setAlert} />
+                        }
+                      />
+                      <Route
+                        path="/payments-transfer"
+                        element={
+                          <PaymentTransfer mood={mood} setAlert={setAlert} />
+                        }
+                      />
+                      <Route
+                        path="/associate-transfer"
+                        element={
+                          <AgentTransfer mood={mood} setAlert={setAlert} />
+                        }
                       />
                     </Routes>
                   </div>

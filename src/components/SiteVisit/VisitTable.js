@@ -243,7 +243,7 @@ const VisitTable = ({ data, mood, setAlert, landingPage }) => {
             <span>Name</span>
             <span>Associate</span>
             <span>Request Booking</span>
-            <span>Site, Time and Date</span>
+            <span>Site, Time and Date, Persons</span>
             <span>Status</span>
             <span>Action</span>
           </div>

@@ -22,8 +22,9 @@ import { FiChevronDown, FiChevronRight } from "react-icons/fi";
 import NiAccount from "../../icons/ni-account";
 import AdminLogo from "../../Assets/Logo/logo-anokhi-homes.png";
 import StaffLogo from "../../Assets/Logo/logo-anokhi-home-green.png";
+import NiTransfer from "../../icons/ni-transfer";
 
-function Sidebar({dark, closeMobile, mood }) {
+function Sidebar({ dark, closeMobile, mood }) {
   const [collapsed, setCollapsed] = useState(false);
   const [openMenu, setOpenMenu] = useState("dash"); // only one open at a time
 
@@ -51,7 +52,28 @@ function Sidebar({dark, closeMobile, mood }) {
       { path: "/plot", label: "Plots", icon: <NiTool /> },
       // { path: "/holdplot", label: "Hold Plots", icon: <NiTool /> },
       { path: "/bookings", label: "Bookings", icon: <NiBooking /> },
-
+      {
+        label: "Transfer",
+        icon: <NiTransfer />,
+        key: "transfer",
+        children: [
+          {
+            path: "/plot-transfer",
+            label: "Plot Transfer",
+            icon: <NiIncome />,
+          },
+          {
+            path: "/payments-transfer",
+            label: "Payments Transfer",
+            icon: <NiPayments />,
+          },
+          {
+            path: "/associate-transfer",
+            label: "Associate Transfer",
+            icon: <NiIncome />,
+          },
+        ],
+      },
       {
         label: "Transactions",
         icon: <NiPayments />,
