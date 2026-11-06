@@ -52,28 +52,28 @@ function Sidebar({ dark, closeMobile, mood }) {
       { path: "/plot", label: "Plots", icon: <NiTool /> },
       // { path: "/holdplot", label: "Hold Plots", icon: <NiTool /> },
       { path: "/bookings", label: "Bookings", icon: <NiBooking /> },
-      {
-        label: "Transfer",
-        icon: <NiTransfer />,
-        key: "transfer",
-        children: [
-          {
-            path: "/plot-transfer",
-            label: "Plot Transfer",
-            icon: <NiIncome />,
-          },
-          {
-            path: "/payments-transfer",
-            label: "Payments Transfer",
-            icon: <NiPayments />,
-          },
-          {
-            path: "/associate-transfer",
-            label: "Associate Transfer",
-            icon: <NiIncome />,
-          },
-        ],
-      },
+      // {
+      //   label: "Transfer",
+      //   icon: <NiTransfer />,
+      //   key: "transfer",
+      //   children: [
+      //     {
+      //       path: "/plot-transfer",
+      //       label: "Plot Transfer",
+      //       icon: <NiIncome />,
+      //     },
+      //     {
+      //       path: "/payments-transfer",
+      //       label: "Payments Transfer",
+      //       icon: <NiPayments />,
+      //     },
+      //     {
+      //       path: "/associate-transfer",
+      //       label: "Associate Transfer",
+      //       icon: <NiIncome />,
+      //     },
+      //   ],
+      // },
       {
         label: "Transactions",
         icon: <NiPayments />,
