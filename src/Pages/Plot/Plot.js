@@ -32,6 +32,8 @@ const PlotList = ({ mood, setAlert }) => {
     image: "",
   });
 
+  // console.log(location,"location")
+
   useEffect(() => {
     if (selectedLocation) {
       setFormData({
@@ -236,11 +238,11 @@ const PlotList = ({ mood, setAlert }) => {
               }}
             />
           </div>
-          {mood === "admin" && (
+          {/* {mood === "admin" && (
             <button className="add-button" onClick={() => setOpen(true)}>
               <LucidePlus /> Add
             </button>
-          )}
+          )} */}
         </div>
       </div>
 

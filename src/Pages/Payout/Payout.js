@@ -23,6 +23,7 @@ import logo from "../../Assets/Logo/logo-anokhi-home-green.png";
 import NiReceipt from "../../icons/ni-receipt";
 import { printPayoutStatement } from "../../components/Utils/printpayoutstatement";
 import CustomSelect from "../../components/CustomSelect/CustomSelect";
+import Loader from "../../components/Loader/Loader";
 
 const STATUS_OPTIONS = ["released", "paid", "cancelled"];
 const PAYABLE_STATUSES = ["released"];
@@ -764,9 +765,7 @@ const Payout = ({ mood, setAlert }) => {
                 <span>Action</span>
               </div>
               {paginated?.length === 0 ? (
-                <div>
-                  <span>No Payout Found</span>
-                </div>
+                <Loader />
               ) : (
                 paginated?.map((item, index) => (
                   <div className="table-row" key={item._id}>
@@ -812,7 +811,7 @@ const Payout = ({ mood, setAlert }) => {
                       >
                         <NiOpenEye />
                       </span>
-                      
+
                       {/* {item.status === "paid" && ( */}
                       <span
                         role="button"
@@ -840,7 +839,19 @@ const Payout = ({ mood, setAlert }) => {
                       >
                         <NiReceipt />
                       </span>
-                      {mood === "admin" && (
+                      {item.netAmount >= 1000 && item.status !== "paid" &&(
+                        <div className="modal-actions">
+                          {/* {canPay(item) && ( */}
+                            <button
+                              className="table-btn"
+                              onClick={() => openDirectPay(item)}
+                            >
+                              Pay
+                            </button>
+                          {/* )} */}
+                        </div>
+                      )}
+                      {/* {mood === "admin" && (
                         <div className="modal-actions">
                           {canPay(item) && (
                             <button
@@ -851,7 +862,7 @@ const Payout = ({ mood, setAlert }) => {
                             </button>
                           )}
                         </div>
-                      )}
+                      )} */}
                       {/* )} */}
                     </div>
                   </div>

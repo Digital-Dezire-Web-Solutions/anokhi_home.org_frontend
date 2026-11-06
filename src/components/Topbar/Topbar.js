@@ -1,17 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import NiSearch from "../../icons/ni-search";
-import NiMoon from "../../icons/ni-moon";
-import NiSun from "../../icons/ni-sun";
 import NiBell from "../../icons/ni-bell";
-import NiTool from "../../icons/ni-tool";
 import { useNavigate } from "react-router-dom";
 import NotificationModal from "../Modals/NotificationModal";
-import SearchModal from "../Modals/SearchModal";
-import MainLogo from "../../icons/MainLogo";
-import AdminLogo from "../../Assets/Logo/logo-anokhi-homes.png";
-import StaffLogo from "../../Assets/Logo/logo-anokhi-home-green.png";
-import AgentLogo from "../../Assets/Logo/logo-anokhi-home-blue.png";
-import UserLogo from "../../Assets/Logo/logo-anokhi-home-yellow.png";
 import NiUser from "../../icons/ni-user";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -22,13 +12,22 @@ import {
   readNotification,
 } from "../../Redux/Slices/AppSlices";
 import NiDrawr from "../../icons/ni-drawr";
-import Floating from "../LandingPage/Floating";
-import { LuChartNoAxesGantt, LuX } from "react-icons/lu";
-import PosterView from "./PosterView";
 import Breadcrumb from "../Breadcrumb/Breadcrumb";
+import Host from "../../Host/Host";
+import axios from "axios";
+import "./Topbar.css";
+import AddLocationModal from "../Modals/AddLocationModal";
 
 function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/");
+    }
+  }, []);
+
   const { userDetail, notificationsCount, notifications, offersData } =
     useSelector((state) => state.app);
   useEffect(() => {
@@ -39,12 +38,13 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
   }, []);
 
   const currentUser = userDetail;
-  const navigate = useNavigate();
   const [openProfile, setOpenProfile] = useState(false);
   const [openNotif, setOpenNotif] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const profileRef = useRef();
   const notifRef = useRef();
+  const [syncing, setSyncing] = useState(false);
+  const [syncReport, setSyncReport] = useState(null);
 
   useEffect(() => {
     if (userDetail) {
@@ -80,12 +80,54 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
     dispatch(getNotificationsCount());
   };
 
+  const handleReadAll = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      await axios.put(
+        `${Host}/api/notification/read-all`,
+        {},
+        { headers: { "auth-token": token } },
+      );
+      dispatch(getNotifications());
+      dispatch(getNotificationsCount());
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
   const createSlug = (name) =>
     name
       .toLowerCase()
       .trim()
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "");
+
+  const handleSync = async () => {
+    if (
+      !window.confirm(
+        "Sync users, locations and colonies from the source database? This overwrites matching records in this database.",
+      )
+    )
+      return;
+
+    try {
+      setSyncing(true);
+      const token = localStorage.getItem("token");
+      const { data } = await axios.post(
+        `${Host}/api/auth/sync-data`,
+        {},
+        { headers: { "auth-token": token } },
+      );
+      setSyncReport(data.report);
+    } catch (err) {
+      console.log(err);
+      setSyncReport({
+        error: err.response?.data?.msg || "Sync failed",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className="topbar">
@@ -97,7 +139,10 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
           >
             <NiDrawr />
           </button>
-          <div className="page-head-title" style={{ margin: "0 0 0 10px", fontSize: "18px" }}>
+          <div
+            className="page-head-title"
+            style={{ margin: "0 0 0 10px", fontSize: "18px" }}
+          >
             <h2 style={{ margin: "0", fontSize: "16px" }}>
               Welcome back, {userDetail?.name}
             </h2>
@@ -119,6 +164,15 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
         </select> */}
 
           {/* Notifications */}
+          {userDetail?.role === "admin" && (
+            <button
+              className="sync-btn"
+              onClick={handleSync}
+              disabled={syncing}
+            >
+              {syncing ? "Syncing..." : "Sync Data"}
+            </button>
+          )}
           <div
             className="notif"
             ref={notifRef}
@@ -133,6 +187,8 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
               <NotificationModal
                 notifications={notifications}
                 handleRead={handleRead}
+                handleReadAll={handleReadAll}
+                onClose={() => setOpenNotif(false)}
               />
             )}
           </div>
@@ -243,6 +299,49 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
           </div> */}
         </div>
       </div>
+      <AddLocationModal
+        open={syncReport}
+        onClose={() => {
+          setSyncReport(false);
+        }}
+        title={"Sync Report"}
+      >
+        {syncReport && (
+          <div className="" onClick={() => setSyncReport(null)}>
+            <div className="" onClick={(e) => e.stopPropagation()}>
+              {syncReport.error ? (
+                <p className="sync-error">{syncReport.error}</p>
+              ) : (
+                Object.entries(syncReport).map(([name, s]) => (
+                  <div key={name} className="sync-row">
+                    <strong style={{ textTransform: "capitalize" }}>
+                      {name}
+                    </strong>
+                    <span>
+                      Source: {s.source} · Added: {s.upserted} · Updated:{" "}
+                      {s.updated}
+                    </span>
+                    {s.errors?.length > 0 && (
+                      <ul className="sync-error">
+                        {s.errors.map((e, i) => (
+                          <li key={i}>{e}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))
+              )}
+              <div className="modal-actions">
+                <button
+                  onClick={() => setSyncReport(null)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AddLocationModal>
     </div>
   );
 }

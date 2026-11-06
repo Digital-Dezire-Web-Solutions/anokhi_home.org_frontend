@@ -65,7 +65,7 @@ const PlotCard = ({
             </div>
           )}
         </div>
-        {mood !== "user" && (
+        {/* {mood !== "user" && (
           <div className="plot-card-actions dots">
             <span
               onClick={(e) => {
@@ -86,7 +86,7 @@ const PlotCard = ({
               <NiDelete />
             </span>
           </div>
-        )}
+        )} */}
       </div>
       <DeleteModal open={deleteOpen} onClose={() => setDeleteOpen(false)}>
         <p>Are you sure you want to delete?</p>

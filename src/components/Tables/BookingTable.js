@@ -426,20 +426,22 @@ const BookingTable = ({
                 </div>
               )}
           </span>
-          <span
-            className={`status ${
-              item.status === "confirmed"
-                ? "active"
-                : item.status === "pending"
-                  ? "pending"
-                  : item.status === "approval"
-                    ? "pending2"
-                    : item.status === "rejected"
-                      ? "failed"
-                      : ""
-            }`}
-          >
-            {item.status}
+          <span>
+            <span
+              className={`status ${
+                item.status === "confirmed"
+                  ? "active"
+                  : item.status === "pending"
+                    ? "pending"
+                    : item.status === "approval"
+                      ? "pending2"
+                      : item.status === "rejected"
+                        ? "failed"
+                        : ""
+              }`}
+            >
+              {item.status}
+            </span>
           </span>
           <div className="dots">
             <span
@@ -702,30 +704,30 @@ const BookingTable = ({
         {/* {item.status === "confirmed" ||
           (item.status === "pending" && (
             <> */}
-              <div class="modal-actions">
-                <button
-                  className={`view-report-btn ${showReport ? "active" : ""}`}
-                  onClick={() => {
-                    setPanelMode("report");
-                    setShowReport(true);
-                    setShowTimeline(false);
-                  }}
-                >
-                  <NiReport />
-                  Report
-                </button>
-                <button
-                  className={`view-report-btn ${showTimeline ? "active" : ""}`}
-                  onClick={() => {
-                    setPanelMode("timeline");
-                    setShowReport(false);
-                    setShowTimeline(true);
-                  }}
-                >
-                  <NiSitevisit /> Timeline
-                </button>
-              </div>
-            {/* </>
+        <div class="modal-actions">
+          <button
+            className={`view-report-btn ${showReport ? "active" : ""}`}
+            onClick={() => {
+              setPanelMode("report");
+              setShowReport(true);
+              setShowTimeline(false);
+            }}
+          >
+            <NiReport />
+            Report
+          </button>
+          <button
+            className={`view-report-btn ${showTimeline ? "active" : ""}`}
+            onClick={() => {
+              setPanelMode("timeline");
+              setShowReport(false);
+              setShowTimeline(true);
+            }}
+          >
+            <NiSitevisit /> Timeline
+          </button>
+        </div>
+        {/* </>
           ))} */}
         {item.status === "pending" &&
           mood !== "user" &&
@@ -808,7 +810,7 @@ const BookingTable = ({
                     let autoAmount = "";
 
                     if (type === "booking") autoAmount = total * 0.1;
-                    if (type === "agreement") autoAmount = total * 0.20;
+                    if (type === "agreement") autoAmount = total * 0.2;
                     if (type === "full") autoAmount = total;
 
                     setFormData({
@@ -972,60 +974,56 @@ const BookingTable = ({
                 {/* AGREEMENT */}
 
                 {/* {bookingPaid && ( */}
-                  <div
-                    className={`installment ${agreementPaid ? "paid" : "pending"}`}
-                  >
-                    <span>Agreement Amount (25%)</span>
-                    <span>
-                      ₹{formatCurrency(agreementAmount)} (
-                      {agreementPaid ? "paid" : "pending"})
-                    </span>
-                  </div>
+                <div
+                  className={`installment ${agreementPaid ? "paid" : "pending"}`}
+                >
+                  <span>Agreement Amount (25%)</span>
+                  <span>
+                    ₹{formatCurrency(agreementAmount)} (
+                    {agreementPaid ? "paid" : "pending"})
+                  </span>
+                </div>
                 {/* )} */}
                 {/* {bookingPaid && ( */}
-                  <div
-                    className={`installment ${agreementPaid ? "paid" : "pending"}`}
-                  >
-                    <span></span>
-                    <span>
-                      {agreementPaid
-                        ? ""
-                        : `${getRemainingDays(
-                            item.paymentSchedule?.booking?.date,
-                            item.paymentSchedule?.agreement?.dueDays || 30,
-                          )} days remaining`}
-                    </span>
-                  </div>
+                <div
+                  className={`installment ${agreementPaid ? "paid" : "pending"}`}
+                >
+                  <span></span>
+                  <span>
+                    {agreementPaid
+                      ? ""
+                      : `${getRemainingDays(
+                          item.paymentSchedule?.booking?.date,
+                          item.paymentSchedule?.agreement?.dueDays || 30,
+                        )} days remaining`}
+                  </span>
+                </div>
                 {/* )} */}
 
                 {/* FULL */}
 
                 {/* {bookingPaid && ( */}
-                  <div
-                    className={`installment ${fullPaid ? "paid" : "pending"}`}
-                  >
-                    <span>Full Payment</span>
-                    <span>
-                      ₹{fullAmount.toLocaleString()}(
-                      {fullPaid ? "paid" : "pending"})
-                    </span>
-                  </div>
+                <div className={`installment ${fullPaid ? "paid" : "pending"}`}>
+                  <span>Full Payment</span>
+                  <span>
+                    ₹{fullAmount.toLocaleString()}(
+                    {fullPaid ? "paid" : "pending"})
+                  </span>
+                </div>
                 {/* )} */}
                 {/* {bookingPaid && ( */}
-                  <div
-                    className={`installment ${fullPaid ? "paid" : "pending"}`}
-                  >
-                    <span></span>
-                    <span>
-                      {fullPaid
-                        ? ""
-                        : `${getRemainingDays(
-                            item.paymentSchedule?.agreement?.date ||
-                              item.paymentSchedule?.booking?.date,
-                            item.paymentSchedule?.full?.dueDays || 90,
-                          )} days remaining`}
-                    </span>
-                  </div>
+                <div className={`installment ${fullPaid ? "paid" : "pending"}`}>
+                  <span></span>
+                  <span>
+                    {fullPaid
+                      ? ""
+                      : `${getRemainingDays(
+                          item.paymentSchedule?.agreement?.date ||
+                            item.paymentSchedule?.booking?.date,
+                          item.paymentSchedule?.full?.dueDays || 90,
+                        )} days remaining`}
+                  </span>
+                </div>
                 {/* )} */}
               </div>
 

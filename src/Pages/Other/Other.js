@@ -1,20 +1,24 @@
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import React, { useEffect, useRef, useState } from "react";
 import "./Other.css";
-import SearchItems from "../../components/SearchItems/SearchItems";
 import Breadcrumb from "../../components/Breadcrumb/Breadcrumb";
 import { useNavigate } from "react-router-dom";
 import NiOpenEye from "../../icons/ni-openEye";
-import NiDots from "../../icons/ni-dots";
-import NiDelete from "../../icons/ni-delete";
-import NiEdit from "../../icons/ni-edit";
 import NiSearch from "../../icons/ni-search";
 import NiCard from "../../icons/ni-card";
 import NiList from "../../icons/ni-list";
-import { LucidePlus } from "lucide-react";
+import {
+  LucidePlus,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  X,
+} from "lucide-react";
 import AddLocationModal from "../../components/Modals/AddLocationModal";
 import ActionModal from "../../components/Modals/ActionModal";
 import DeleteModal from "../../components/Modals/DeleteModal";
-import NiClosseye from "../../icons/ni-closseye";
 import { useDispatch, useSelector } from "react-redux";
 import {
   getUser,
@@ -29,16 +33,27 @@ import NiUser from "../../icons/ni-user";
 import Stars from "../../components/Utils/Stars";
 import UserForm from "../../components/UserForm/UserForm";
 import Pagination from "../../components/Pagination/Pagination";
+import logo from "../../Assets/Logo/logo-anokhi-home-green.png";
+import { ShieldAlert } from "lucide-react";
+import Loader from "../../components/Loader/Loader";
 
-const ITEMS_PER_PAGE = 15;
+const ITEMS_PER_PAGE = 25;
 const Other = ({ mood, setAlert, data }) => {
   const dispatch = useDispatch();
   const { users, staffRoles } = useSelector((state) => state.app);
+  const canView = mood === "admin" || mood === "staff";
 
   useEffect(() => {
+    if (!canView) return;
     dispatch(getUser());
     dispatch(getStaffRoles());
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canView]);
+
+  // useEffect(() => {
+  //   dispatch(getUser());
+  //   dispatch(getStaffRoles());
+  // }, []);
 
   // console.log(staffRoles, "staffRoles")
   const navigate = useNavigate();
@@ -51,10 +66,11 @@ const Other = ({ mood, setAlert, data }) => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedDeleteUser, setSelectedDeleteUser] = useState(null);
   const [referalMsg, setReferralMsg] = useState(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportRole, setExportRole] = useState("all");
 
   const [formData, setFormData] = useState({
     user: "",
@@ -79,17 +95,25 @@ const Other = ({ mood, setAlert, data }) => {
   const filteredData = users?.filter((item) => {
     // Role filter
     const matchesRole =
-      filter === "all" || item.role?.toLowerCase() === filter?.toLowerCase();
+      filter === "all" || item?.role?.toLowerCase() === filter.toLowerCase();
 
-    // Search filter
-    const searchValue = search.toLowerCase();
+    const searchValue = search.trim().toLowerCase();
+
+    // If search is empty, don't need to check fields
+    if (!searchValue) {
+      return matchesRole;
+    }
 
     const matchesSearch =
-      item.name.toLowerCase().includes(searchValue) ||
-      item.email?.toLowerCase().includes(searchValue) ||
-      item.phone?.includes(searchValue) ||
-      item.id.toString().includes(searchValue) ||
-      item.user.toLowerCase().includes(searchValue);
+      item?.name?.toLowerCase().includes(searchValue) ||
+      item?.email?.toLowerCase().includes(searchValue) ||
+      item?.phone?.toString().includes(searchValue) ||
+      item?._id?.toString().toLowerCase().includes(searchValue) ||
+      item?.id?.toString().toLowerCase().includes(searchValue) ||
+      item?.user?.toLowerCase().includes(searchValue) ||
+      item?.referralId?.toLowerCase().includes(searchValue) ||
+      item?.designation?.toLowerCase().includes(searchValue) ||
+      item?.referredBy?.name?.toLowerCase().includes(searchValue);
 
     return matchesRole && matchesSearch;
   });
@@ -224,31 +248,404 @@ const Other = ({ mood, setAlert, data }) => {
 
   // console.log(currentData, "item")
 
+  /* =====================================================
+   EXPORT USERS
+===================================================== */
+
+  const getExportUsers = () => {
+    if (!users || !Array.isArray(users)) {
+      return [];
+    }
+
+    if (exportRole === "all") {
+      return users;
+    }
+
+    return users.filter(
+      (user) => user?.role?.toLowerCase() === exportRole.toLowerCase(),
+    );
+  };
+
+  /* =====================================================
+     FORMAT USER DATA FOR EXPORT
+  ===================================================== */
+
+  const getExportRows = () => {
+    const selectedUsers = getExportUsers();
+
+    return selectedUsers.map((user, index) => {
+      const referredBy =
+        user?.role === "agent" && user?.referredBy ? user.referredBy : null;
+
+      const role =
+        user?.role === "agent"
+          ? "Associate"
+          : user?.role === "staff"
+            ? "Staff"
+            : user?.role === "admin"
+              ? "Admin"
+              : "Customer";
+
+      /* =========================
+         CUSTOMER
+      ========================= */
+      if (exportRole === "user") {
+        return {
+          "S.No": index + 1,
+          Name: user?.name || "-",
+          Phone: user?.phone || "-",
+          "User Type": role,
+          UserID: user?.referralId || "-",
+        };
+      }
+
+      /* =========================
+         ASSOCIATE
+      ========================= */
+      if (exportRole === "agent") {
+        return {
+          "S.No": index + 1,
+          Name: user?.name || "-",
+          Phone: user?.phone || "-",
+          "User Type": "Associate",
+          UserID: user?.referralId || "-",
+
+          "Referred By Name": referredBy?.name || "-",
+          "Referred By Phone": referredBy?.phone || "-",
+          "Referred By UserID": referredBy?.referralId || "-",
+
+          Designation: user?.designation || "-",
+          "Direct Income %": `${user?.directIncomePercent ?? 0}%`,
+        };
+      }
+
+      /* =========================
+         STAFF
+      ========================= */
+      if (exportRole === "staff") {
+        return {
+          "S.No": index + 1,
+          Name: user?.name || "-",
+          Phone: user?.phone || "-",
+          "User Type": "Staff",
+          UserID: user?.referralId || "-",
+          // Raw role code (distinct from the friendly "User Type" label above)
+        };
+      }
+
+      /* =========================
+         ALL USERS
+      ========================= */
+      return {
+        "S.No": index + 1,
+        Name: user?.name || "-",
+        Phone: user?.phone || "-",
+        "User Type": role,
+        UserID: user?.referralId || "-",
+
+        "Referred By Name":
+          user?.role === "agent" ? referredBy?.name || "-" : "-",
+
+        "Referred By Phone":
+          user?.role === "agent" ? referredBy?.phone || "-" : "-",
+
+        "Referred By UserID":
+          user?.role === "agent" ? referredBy?.referralId || "-" : "-",
+
+        Designation:
+          user?.role === "agent" || user?.role === "admin"
+            ? user?.designation || "-"
+            : "-",
+
+        "Direct Income %":
+          user?.role === "agent" || user?.role === "admin"
+            ? `${user?.directIncomePercent ?? 0}%`
+            : "-",
+      };
+    });
+  };
+
+  /* =====================================================
+     EXPORT EXCEL
+  ===================================================== */
+
+  const exportToExcel = () => {
+    const rows = getExportRows();
+
+    if (!rows.length) {
+      setAlert({
+        message: "No users found for selected filter",
+        status: "Error",
+      });
+
+      setTimeout(() => {
+        setAlert(null);
+      }, 3000);
+
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+
+    /* Auto column width */
+
+    const columnWidths = Object.keys(rows[0]).map((key) => {
+      const maxLength = Math.max(
+        key.length,
+        ...rows.map((row) => String(row[key] ?? "").length),
+      );
+
+      return {
+        wch: Math.min(maxLength + 3, 40),
+      };
+    });
+
+    worksheet["!cols"] = columnWidths;
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+
+    const fileName =
+      exportRole === "all" ? "all-users.xlsx" : `${exportRole}-users.xlsx`;
+
+    XLSX.writeFile(workbook, fileName);
+
+    setAlert({
+      message: "Excel exported successfully",
+      status: "Success",
+    });
+
+    setTimeout(() => {
+      setAlert(null);
+    }, 3000);
+
+    setExportOpen(false);
+  };
+
+  /* =====================================================
+     EXPORT PDF
+  ===================================================== */
+  const loadLogo = (src) =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        resolve({
+          data: canvas.toDataURL("image/png"),
+          ratio: img.naturalWidth / img.naturalHeight,
+        });
+      };
+      img.onerror = () => resolve(null); // export still works without the logo
+      img.src = src;
+    });
+  const exportToPDF = async () => {
+    const rows = getExportRows();
+
+    if (!rows.length) {
+      setAlert({
+        message: "No users found for selected filter",
+        status: "Error",
+      });
+
+      setTimeout(() => {
+        setAlert(null);
+      }, 3000);
+
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const logoImg = await loadLogo(logo);
+    const LOGO_HEIGHT = 14; // mm
+    const RIGHT_MARGIN = 5; // matches this table's right margin
+
+    const drawLogo = () => {
+      if (!logoImg) return;
+      const w = LOGO_HEIGHT * logoImg.ratio; // keeps the aspect ratio
+      const x = doc.internal.pageSize.getWidth() - RIGHT_MARGIN - w;
+      doc.addImage(logoImg.data, "PNG", x, 6, w, LOGO_HEIGHT);
+    };
+
+    const title =
+      exportRole === "all"
+        ? "All Users"
+        : exportRole === "agent"
+          ? "All Associates"
+          : exportRole === "staff"
+            ? "All Staff"
+            : "All Customers";
+
+    doc.setFontSize(18);
+    doc.text(title, 14, 15);
+
+    doc.setFontSize(9);
+    doc.text(`Total Records: ${rows.length}`, 10, 22);
+
+    const columns = Object.keys(rows[0]);
+
+    const body = rows.map((row) => columns.map((column) => row[column] ?? "-"));
+
+    // Base widths (proportions relative to each other, not final mm)
+    const baseWidths = {
+      "S.No": 8,
+      Name: 25,
+      Phone: 14,
+      "User Type": 12,
+      UserID: 14,
+      "Referred By Name": 25,
+      "Referred By Phone": 14,
+      "Referred By UserID": 14,
+      Designation: 25,
+      "Direct Income %": 10,
+    };
+
+    const margin = { top: 27, left: 5, right: 5, bottom: 8 };
+
+    // Work out how much horizontal space we actually have to fill
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const availableWidth = pageWidth - margin.left - margin.right;
+
+    // Sum of base widths for only the columns actually being exported
+    const totalBase = columns.reduce(
+      (sum, col) => sum + (baseWidths[col] || 18),
+      0,
+    );
+
+    // Scale factor so the columns always add up to the full available width
+    const scale = availableWidth / totalBase;
+
+    const columnStyles = {};
+    columns.forEach((column, index) => {
+      const base = baseWidths[column] || 18;
+      columnStyles[index] = {
+        cellWidth: base * scale,
+      };
+    });
+
+    autoTable(doc, {
+      head: [columns],
+      body,
+      startY: margin.top,
+      theme: "grid",
+      tableWidth: "auto", // let it use the full available width instead of "wrap"
+      styles: {
+        fontSize: 7, // bumped up now that there's room
+        cellPadding: 1.5,
+        overflow: "linebreak",
+        valign: "middle",
+        halign: "left",
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fontSize: 7,
+        fontStyle: "bold",
+        valign: "middle",
+      },
+      bodyStyles: {
+        valign: "middle",
+      },
+      columnStyles,
+      margin,
+      didDrawPage: drawLogo,
+    });
+
+    const fileName =
+      exportRole === "all" ? "all-users.pdf" : `${exportRole}-users.pdf`;
+
+    doc.save(fileName);
+
+    setAlert({
+      message: "PDF exported successfully",
+      status: "Success",
+    });
+
+    setTimeout(() => {
+      setAlert(null);
+    }, 3000);
+
+    setExportOpen(false);
+  };
+
+  // role not known yet (user is still being loaded)
+  if (!mood) {
+    return (
+      <div className="plot-container">
+        <Loader />
+      </div>
+    );
+  }
+
+  if (!canView) {
+    return (
+      <div className="plot-container">
+        <div className="table-filters">
+          <div className="page-head-title">
+            <h2>Users</h2>
+            <Breadcrumb />
+          </div>
+        </div>
+
+        <div className="card not-allowed-box">
+          <ShieldAlert size={42} />
+          <h3>Not Allowed</h3>
+          <p>You do not have permission to view this page.</p>
+          <div className="modal-actions">
+            <button onClick={() => navigate("/dashboard")}>
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="plot-container user-table-box">
       {/* Filters */}
       <div className="table-filters">
-        {/* <div className="page-head-title">
+        <div className="page-head-title">
           <h2>Users</h2>
           <Breadcrumb />
-        </div> */}
+        </div>
         <div className="page-tools">
           {(mood === "admin" || mood === "staff") && (
-            <button
-              className="add-button"
-              onClick={() => {
-                setSelectedUser(null);
-                setIsEditMode(false);
-                setOpen(true);
-              }}
-            >
-              <LucidePlus /> Add
-            </button>
+            <>
+              {/* <button
+                className="add-button"
+                onClick={() => {
+                  setSelectedUser(null);
+                  setIsEditMode(false);
+                  setOpen(true);
+                }}
+              >
+                <LucidePlus /> Add
+              </button> */}
+              <button
+                className="add-button"
+                onClick={() => {
+                  setExportRole("all");
+                  setExportOpen(true);
+                }}
+              >
+                <Download size={18} />
+                Export
+              </button>
+            </>
           )}
           <div className="searchItem">
             <NiSearch />
             <input
-              placeholder="Search Nane"
+              placeholder="Search Name, Number, Referral Id..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -312,7 +709,7 @@ const Other = ({ mood, setAlert, data }) => {
               <span>Image</span>
               <span>Role</span>
               <span>Name</span>
-              <span>Referral Id</span>
+              <span>User ID</span>
               <span>Designation</span>
               <span>Referred By</span>
               <span>Rating</span>
@@ -321,8 +718,8 @@ const Other = ({ mood, setAlert, data }) => {
             </div>
 
             {currentData?.map((item, index) => (
-              <div key={item.id} className="table-row">
-                <span>{index + 1}</span>
+              <div key={item._id} className="table-row">
+                <span>{startIndex + index + 1}</span>
                 {item?.avatar ? (
                   <img
                     src={item.avatar}
@@ -348,9 +745,7 @@ const Other = ({ mood, setAlert, data }) => {
                 <span>{item?.referralId}</span>
                 <span className="title">
                   {item.role === "agent" || item.role === "admin" ? (
-                    <>
-                      {item.designation}({item.directIncomePercent}%){" "}
-                    </>
+                    <>{item.designation} </>
                   ) : item.role === "staff" ? (
                     <>{item.staffRole?.name}</>
                   ) : (
@@ -370,17 +765,19 @@ const Other = ({ mood, setAlert, data }) => {
                 ) : (
                   "-"
                 )}
-
-                {(((item.status !== "approval" && mood === "admin") ||
-                  (item.status !== "approval" && mood === "staff")) && (
-                    <label className="switch">
-                      <input
-                        type="checkbox"
-                        checked={item.status === "active"}
-                        onChange={() => handleStatusToggle(item)}
-                      />
-                      <span className="slider"></span>
-                    </label>
+                <span>
+                  {(((item.status !== "approval" && mood === "admin") ||
+                    (item.status !== "approval" && mood === "staff")) && (
+                    <span>
+                      <label className="switch">
+                        <input
+                          type="checkbox"
+                          checked={item.status === "active"}
+                          onChange={() => handleStatusToggle(item)}
+                        />
+                        <span className="slider"></span>
+                      </label>
+                    </span>
                   )) || (
                     <span
                       className={`status ${item.status === "approval" ? "pending" : item.status}`}
@@ -388,7 +785,7 @@ const Other = ({ mood, setAlert, data }) => {
                       {item.status}
                     </span>
                   )}
-
+                </span>
                 <div className="dots">
                   <span
                     onClick={() =>
@@ -465,7 +862,7 @@ const Other = ({ mood, setAlert, data }) => {
                     <NiOpenEye />
                   </span>
 
-                  <span
+                  {/* <span
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveRow(activeRow === item._id ? null : item._id);
@@ -488,7 +885,7 @@ const Other = ({ mood, setAlert, data }) => {
                         setDeleteOpen(true);
                       }}
                     />
-                  )}
+                  )} */}
                 </div>
               </div>
               {item.role === "agent" && (
@@ -520,12 +917,12 @@ const Other = ({ mood, setAlert, data }) => {
                     <span className="slider"></span>
                   </label>
                 )) || (
-                    <span
-                      className={`status ${item.status === "approval" ? "pending" : ""}`}
-                    >
-                      {item.status === "approval" && "Pending"}
-                    </span>
-                  )}
+                  <span
+                    className={`status ${item.status === "approval" ? "pending" : ""}`}
+                  >
+                    {item.status === "approval" && "Pending"}
+                  </span>
+                )}
               </div>
 
               {/* <div className="user-card-bottom">
@@ -537,40 +934,39 @@ const Other = ({ mood, setAlert, data }) => {
         </div>
       )}
       {/* Pagination */}
-      {/* {totalPages > 1 && (
-        <div className="pagination">
-          <button
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => p - 1)}
-          >
-            Prev
-          </button>
-
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <button
-              key={i}
-              className={currentPage === i + 1 ? "active" : ""}
-              onClick={() => setCurrentPage(i + 1)}
-            >
-              {i + 1}
-            </button>
-          ))}
-
-          <button
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => p + 1)}
-          >
-            Next
-          </button>
+      <div className="pagination-wrapper">
+        <div className="pagination-info">
+          {filteredData?.length > 0 ? (
+            <>
+              Showing <strong>{startIndex + 1}</strong>
+              {" – "}
+              <strong>
+                {Math.min(startIndex + ITEMS_PER_PAGE, filteredData.length)}
+              </strong>{" "}
+              of <strong>{filteredData.length}</strong> users
+            </>
+          ) : (
+            "No users found"
+          )}
         </div>
-      )} */}
-      <Pagination page={currentPage} totalPages={totalPages} setPage={setCurrentPage} />
+
+        {totalPages > 1 && (
+          <Pagination
+            page={currentPage}
+            totalPages={totalPages}
+            setPage={setCurrentPage}
+          />
+        )}
+      </div>
       <AddLocationModal
         open={open}
         onClose={() => setOpen(false)}
         title={isEditMode ? "Edit User" : "Add User"}
       >
-        <div className="auth-card" style={{ padding: "0", width:"auto", boxShadow: "none" }}>
+        <div
+          className="auth-card"
+          style={{ padding: "0", width: "auto", boxShadow: "none" }}
+        >
           <UserForm
             mode="admin"
             setAlert={setAlert}
@@ -632,6 +1028,126 @@ const Other = ({ mood, setAlert, data }) => {
           </button>
         </div>
       </DeleteModal>
+      {/* =====================================================
+    EXPORT MODAL
+===================================================== */}
+      <AddLocationModal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        title="Export User"
+      >
+        {/* <div className="export-modal"> */}
+        <div className="export-modal-body">
+          <p>Select which users you want to export</p>
+
+          <label>Select Users {getExportUsers().length}</label>
+
+          <select
+            value={exportRole}
+            onChange={(e) => setExportRole(e.target.value)}
+          >
+            <option value="all">All Users</option>
+
+            <option value="agent">All Associates</option>
+
+            <option value="staff">All Staff</option>
+
+            <option value="user">All Customers</option>
+          </select>
+
+          {/* <div className="export-count">
+              {getExportUsers().length} users selected
+            </div> */}
+
+          <div className="export-fields">
+            <p>Export includes:</p>
+
+            {/* =========================
+      CUSTOMER
+  ========================= */}
+            {exportRole === "user" && (
+              <>
+                <span>S.No</span>
+                <span>Name</span>
+                <span>Phone</span>
+                <span>User Type</span>
+                <span>UserID</span>
+              </>
+            )}
+
+            {/* =========================
+      ASSOCIATE / AGENT
+  ========================= */}
+            {exportRole === "agent" && (
+              <>
+                <span>S.No</span>
+                <span>Name</span>
+                <span>Phone</span>
+                <span>User Type</span>
+                <span>UserID</span>
+                <span>Referred By Name</span>
+                <span>Referred By Phone</span>
+                <span>Referred By UserID</span>
+                <span>Designation</span>
+                <span>Direct Income %</span>
+              </>
+            )}
+
+            {/* =========================
+      STAFF
+  ========================= */}
+            {exportRole === "staff" && (
+              <>
+                <span>S.No</span>
+                <span>Name</span>
+                <span>Phone</span>
+                <span>User Type</span>
+                <span>UserID</span>
+              </>
+            )}
+
+            {/* =========================
+      ALL USERS
+  ========================= */}
+            {exportRole === "all" && (
+              <>
+                <span>S.No</span>
+                <span>Name</span>
+                <span>Phone</span>
+                <span>User Type</span>
+                <span>UserID</span>
+                <span>Referred By Name</span>
+                <span>Referred By Phone</span>
+                <span>Referred By UserID</span>
+                <span>Designation</span>
+                <span>Direct Income %</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="modal-actions" style={{ marginTop: "1rem" }}>
+          <button
+            type="button"
+            className="export-excel-btn"
+            onClick={exportToExcel}
+          >
+            <FileSpreadsheet size={18} />
+            Excel
+          </button>
+
+          <button
+            type="button"
+            className="export-pdf-btn"
+            onClick={exportToPDF}
+          >
+            <FileText size={18} />
+            PDF
+          </button>
+        </div>
+
+        {/* </div> */}
+      </AddLocationModal>
     </div>
   );
 };

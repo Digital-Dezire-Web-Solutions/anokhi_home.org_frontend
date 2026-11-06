@@ -3,6 +3,7 @@ import Host from "../../Host/Host";
 
 // Helper
 const getToken = () => localStorage.getItem("token");
+const Host2 = "https://api.anokhihomes.net"
 
 // ========================
 // 🔥 Async Thunks
@@ -33,7 +34,7 @@ export const getUserRole = createAsyncThunk("app/getUserRole", async (role) => {
 });
 
 export const getUser = createAsyncThunk("app/getUser", async () => {
-  const res = await fetch(`${Host}/api/auth/all-users`, {
+  const res = await fetch(`${Host2}/api/auth/all-users`, {
     headers: {
       "Content-Type": "application/json",
       "auth-token": getToken(),
@@ -42,7 +43,7 @@ export const getUser = createAsyncThunk("app/getUser", async () => {
   return res.json();
 });
 export const getCustomers = createAsyncThunk("app/customers", async () => {
-  const res = await fetch(`${Host}/api/auth/my-connected-users`, {
+  const res = await fetch(`${Host2}/api/auth/my-connected-users`, {
     headers: {
       "Content-Type": "application/json",
       "auth-token": getToken(),
@@ -52,7 +53,7 @@ export const getCustomers = createAsyncThunk("app/customers", async () => {
 });
 
 export const getUserById = createAsyncThunk("app/getUserById", async (id) => {
-  const res = await fetch(`${Host}/api/auth/user/${id}`, {
+  const res = await fetch(`${Host2}/api/auth/user/${id}`, {
     headers: {
       "Content-Type": "application/json",
       "auth-token": getToken(),
@@ -199,7 +200,7 @@ export const getPayments = createAsyncThunk("app/getPayments", async () => {
 });
 
 export const getLocation = createAsyncThunk("app/getLocation", async () => {
-  const res = await fetch(`${Host}/api/location`, {
+  const res = await fetch(`${Host2}/api/location`, {
     headers: {
       "Content-Type": "application/json",
       "auth-token": getToken(),
@@ -211,7 +212,7 @@ export const getLocation = createAsyncThunk("app/getLocation", async () => {
 export const getAllColonies = createAsyncThunk(
   "app/getAllColonies",
   async (locationId) => {
-    const res = await fetch(`${Host}/api/colony`, {
+    const res = await fetch(`${Host2}/api/colony`, {
       headers: {
         "Content-Type": "application/json",
         "auth-token": getToken(),
@@ -223,7 +224,7 @@ export const getAllColonies = createAsyncThunk(
 export const getProjects = createAsyncThunk(
   "app/getProjects",
   async (locationId) => {
-    const res = await fetch(`${Host}/api/colony/location/${locationId}`, {
+    const res = await fetch(`${Host2}/api/colony/location/${locationId}`, {
       headers: {
         "Content-Type": "application/json",
         "auth-token": getToken(),
@@ -234,7 +235,7 @@ export const getProjects = createAsyncThunk(
 );
 
 export const getPlots = createAsyncThunk("app/getPlots", async (locationId) => {
-  const res = await fetch(`${Host}/api/plot/${locationId}`, {
+  const res = await fetch(`${Host2}/api/plot/${locationId}`, {
     headers: {
       "Content-Type": "application/json",
       "auth-token": getToken(),

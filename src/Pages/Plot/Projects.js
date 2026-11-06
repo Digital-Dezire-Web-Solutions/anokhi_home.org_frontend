@@ -254,11 +254,11 @@ const Projects = ({ mood, setAlert }) => {
               }}
             />
           </div>
-          {mood === "admin" && (
+          {/* {mood === "admin" && (
             <button className="add-button" onClick={() => setOpen(true)}>
               <LucidePlus /> Add
             </button>
-          )}
+          )} */}
            <div className="page-toggle">
             <span
               className={`${viewItem === false ? "active" : ""}`}

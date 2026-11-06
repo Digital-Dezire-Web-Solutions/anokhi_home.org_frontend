@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import Breadcrumb from "../../components/Breadcrumb/Breadcrumb";
-import AddLocationModal from "../../components/Modals/AddLocationModal";
-import Host from "../../Host/Host";
-import formatDate from "../../components/DateFormate/DateFormate";
 import "./Eventsadmin.css";
 import { uploadImage } from "../../Pages/LandingSetting/LandingApi";
+import Host from "../../Host/Host";
+import { LuPlus } from "react-icons/lu";
 import NiDelete from "../../icons/ni-delete";
+import formatDate from "../DateFormate/DateFormate";
+import AddLocationModal from "../Modals/AddLocationModal";
 
 const authHeaders = () => ({
   headers: { "auth-token": localStorage.getItem("token") },
@@ -265,7 +265,7 @@ const EventsAdmin = ({ setAlert }) => {
   return (
     <div className="admin-config-box">
       <div>
-        <div className="table-filters">
+        <div className="table-filters card-filter">
           <button
             className={tab === "festivals" ? "active" : ""}
             onClick={() => setTab("festivals")}
@@ -288,10 +288,12 @@ const EventsAdmin = ({ setAlert }) => {
 
         {tab === "festivals" && (
           <div className="card table-box">
+              <div className="table-filters card-filter">
+                <button className="add-button" onClick={openAddFestival}>
+                 <LuPlus/> Add festival
+                </button>
+              </div>
             <div className="events-toolbar">
-              <button className="add-button" onClick={openAddFestival}>
-                Add festival
-              </button>
               <label>Year</label>
               <input
                 type="number"
@@ -376,7 +378,7 @@ const EventsAdmin = ({ setAlert }) => {
                         }
                       />
                     </span>
-                    <span>
+                    <div className="modal-actions">
                       <button
                         className="table-btn"
                         disabled={!dirty || savingId === f._id}
@@ -384,7 +386,7 @@ const EventsAdmin = ({ setAlert }) => {
                       >
                         {savingId === f._id ? "Saving..." : "Save"}
                       </button>
-                    </span>
+                    </div>
                   </div>
                 );
               })}
@@ -423,9 +425,9 @@ const EventsAdmin = ({ setAlert }) => {
         )}
         {tab === "events" && (
           <>
-            <div className="events-toolbar">
+            <div className="table-filters card-filter">
               <button className="add-button" onClick={openCreate}>
-                Add event
+                <LuPlus/> Add event
               </button>
             </div>
 

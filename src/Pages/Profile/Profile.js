@@ -346,7 +346,7 @@ const Profile = ({ mood, currentUser, setAlert }) => {
                 {isOwnProfile && (
                   <div className="avatar-actions">
                     <label className="avatar-upload-btn">
-                      {avatarUploading ? "Uploading..." : <NiEdit />}
+                      {/* {avatarUploading ? "Uploading..." : <NiEdit />} */}
                       <input
                         type="file"
                         accept="image/*"
@@ -354,14 +354,14 @@ const Profile = ({ mood, currentUser, setAlert }) => {
                         onChange={(e) => handleAvatarChange(e.target.files[0])}
                       />
                     </label>
-                    {userData.avatar && (
+                    {/* {userData.avatar && (
                       <span
                         className="avatar-remove-btn"
                         onClick={handleRemoveAvatar}
                       >
                         <NiDelete />
                       </span>
-                    )}
+                    )} */}
                   </div>
                 )}
               </div>
@@ -403,14 +403,14 @@ const Profile = ({ mood, currentUser, setAlert }) => {
                   <>
                     <h3 style={{ margin: 0 }}>{userData.name}</h3>
 
-                    {mood === "admin" && (
+                    {/* {mood === "admin" && (
                       <span
                         style={{ cursor: "pointer" }}
                         onClick={() => setEditingName(true)}
                       >
                         <NiEdit />
                       </span>
-                    )}
+                    )} */}
                   </>
                 )}
               </div>

@@ -219,7 +219,7 @@ const PlotDrawCard = ({ data, mood, setAlert, projectId }) => {
         />
       )}
 
-      {isAdmin &&
+      {/* {isAdmin &&
         (canEdit ? (
           <button className="plot-edit-btn cancel" onClick={cancelEdit}>
             <X size={16} /> Cancel
@@ -228,7 +228,7 @@ const PlotDrawCard = ({ data, mood, setAlert, projectId }) => {
           <button className="plot-edit-btn" onClick={() => setEditMode(true)}>
             <Pencil size={16} /> Edit
           </button>
-        ))}
+        ))} */}
 
       <button
         className="fullscreen-toggle-btn"
