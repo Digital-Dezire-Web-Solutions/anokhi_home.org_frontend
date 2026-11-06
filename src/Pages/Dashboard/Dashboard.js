@@ -133,6 +133,13 @@ const Dashboard = ({ setAlert, mood, data }) => {
     );
   }, [incomeSummary]);
 
+  const truncateWords = (text = "", limit = 10) => {
+    const words = text.trim().split(/\s+/);
+    return words.length > limit
+      ? words.slice(0, limit).join(" ") + "..."
+      : text;
+  };
+
   return (
     <div className="plot-container">
       {/* <div className="table-filters">
@@ -172,7 +179,7 @@ const Dashboard = ({ setAlert, mood, data }) => {
                 className="dashboard-box-item card main"
                 style={{
                   alignItems: "flex-start",
-                  padding: "1.5rem 1.5rem 3.5rem 1.5rem",
+                  padding: "1.5rem",
                 }}
               >
                 <div className="dashboard-box-item-left">
@@ -199,7 +206,7 @@ const Dashboard = ({ setAlert, mood, data }) => {
                         >
                           <h4>{item.title}</h4>
 
-                          <p>{item.description}</p>
+                          <p>{truncateWords(item.description, 10)}</p>
 
                           {item.priceValue && (
                             <span className="offer-badge">
