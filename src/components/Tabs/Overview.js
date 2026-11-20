@@ -1413,7 +1413,6 @@ const Overview = ({ userData, mood, setAlert }) => {
         <div className="modal-actions">
           <button
             disabled={!isPasswordFormValid}
-            disabled={saving}
             style={{
               opacity: !isPasswordFormValid ? 0.5 : 1,
               cursor: !isPasswordFormValid ? "not-allowed" : "pointer",
