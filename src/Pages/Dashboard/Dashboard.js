@@ -40,6 +40,7 @@ const Dashboard = ({ setAlert, mood, data }) => {
   const [open, setOpen] = useState(false);
   const [actionType, setActionType] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
+  const [cycleFilter, setCycleFilter] = useState("");
 
   const [formData, setFormData] = useState({});
 
@@ -126,12 +127,18 @@ const Dashboard = ({ setAlert, mood, data }) => {
 
     return `${days} days remaining`;
   };
-  console.log(incomeSummary);
-  const sortedData = useMemo(() => {
-    return [...(incomeSummary || [])].sort(
-      (a, b) => (b.selfBusiness || 0) - (a.selfBusiness || 0),
-    );
-  }, [incomeSummary]);
+
+  const commissionData = incomeSummary || [];
+
+  const filteredData = useMemo(() => {
+    return commissionData.filter((item) => {
+      const matchPayable = Number(item?.incomeSummary?.payableAmount || 0) > 0;
+
+      const matchCycle = !cycleFilter || item?.cycleDate === cycleFilter;
+
+      return matchPayable && matchCycle;
+    });
+  }, [commissionData]);
 
   const truncateWords = (text = "", limit = 10) => {
     const words = text.trim().split(/\s+/);
@@ -256,10 +263,10 @@ const Dashboard = ({ setAlert, mood, data }) => {
               </div>
               <div className="table-box">
                 <div className="table ">
-                  {sortedData?.length === 0 ? (
-                    <p>No Bookings Found</p>
+                  {filteredData?.length === 0 ? (
+                    <p>No Top Performers Found</p>
                   ) : (
-                    sortedData
+                    filteredData
                       ?.slice(0, 5)
                       ?.map((item, index) => (
                         <TopPerformer
