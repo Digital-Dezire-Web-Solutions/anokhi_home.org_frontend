@@ -56,6 +56,7 @@ import PlotTransfer from "./Pages/Transfer/PlotTransfer";
 import PaymentTransfer from "./Pages/Transfer/PaymentTransfer";
 import AgentTransfer from "./Pages/Transfer/AgentTransfer";
 import ColonyPlots from "./Pages/ColonyPlots/ColonyPlots";
+import BottomNav from "./components/BottomNav/BottomNav";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -168,7 +169,7 @@ function App() {
             element={
               <>
                 <div className="main">
-                  <div
+                  {/* <div
                     className={
                       mobileOpen ? "sidebar-wrap show" : "sidebar-wrap"
                     }
@@ -178,10 +179,17 @@ function App() {
                       mood={mood}
                       dark={dark}
                     />
-                  </div>
+                  </div> */}
 
                   <div className="page-wrap">
                     <Topbar
+                      dark={dark}
+                      setDark={setDark}
+                      setMobileOpen={setMobileOpen}
+                      mood={mood}
+                      setMood={setMood}
+                    />
+                    <BottomNav
                       dark={dark}
                       setDark={setDark}
                       setMobileOpen={setMobileOpen}

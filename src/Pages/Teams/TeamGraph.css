@@ -1,0 +1,232 @@
+/* ==========================================================
+   WRAPPER / CANVAS — dark navy background like the reference
+========================================================== */
+
+.team-graph-wrapper {
+  width: 100%;
+  height: 100vh;
+  background: white;
+}
+
+.team-graph-wrapper .react-flow__renderer,
+.team-graph-wrapper .react-flow__background {
+  background-color: white;
+}
+
+.team-graph-wrapper .react-flow__background circle {
+  fill: white;
+}
+
+/* ==========================================================
+   EDGES
+========================================================== */
+
+.team-graph-wrapper .react-flow__edge-path {
+  stroke-width: 2.5;
+  opacity: 0.9;
+}
+
+/* ==========================================================
+   NODE — outer wrapper (card stacked under handles)
+========================================================== */
+
+.team-graph-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 140px;
+  pointer-events: none;
+}
+
+.team-graph-node * {
+  pointer-events: auto;
+}
+
+/* ==========================================================
+   THE CARD
+========================================================== */
+
+.team-graph-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 130px;
+  min-height: 120px;
+  border-radius: 16px;
+  text-align: center;
+  padding: 14px 10px;
+  box-sizing: border-box;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.team-graph-card.clickable {
+  cursor: pointer;
+}
+
+.team-graph-card.clickable:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.team-graph-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  background: #eceefb;
+  color: #222;
+}
+
+.team-graph-name {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #1a1a2e;
+  text-transform: uppercase;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.team-graph-designation {
+  font-size: 10px;
+  color: #888;
+  margin-top: 3px;
+  text-transform: capitalize;
+}
+
+.team-graph-refid {
+  font-size: 9px;
+  color: #b0b0b0;
+  margin-top: 2px;
+}
+
+/* ==========================================================
+   ROOT NODE — center, distinct accent
+========================================================== */
+
+.team-graph-root .team-graph-card {
+  min-height: 130px;
+  border: 2px solid #ffb020;
+}
+
+.team-graph-root .team-graph-avatar {
+  background: #fff3dc;
+  color: #b8760a;
+}
+
+/* ==========================================================
+   LEFT TEAM — purple
+========================================================== */
+
+.team-graph-left .team-graph-avatar {
+  background: #f9cfcf;
+  color: var(--mood-color);
+}
+
+.team-graph-left .team-graph-card {
+  border-top: 3px solid var(--mood-color);
+}
+
+/* ==========================================================
+   RIGHT TEAM — green
+========================================================== */
+
+.team-graph-right .team-graph-avatar {
+  background: #e6f9dc;
+  color: #67bb3a;
+}
+
+.team-graph-right .team-graph-card {
+  border-top: 3px solid #67bb3a;
+}
+
+/* ==========================================================
+   EXPAND BADGE — shows count of hidden children
+========================================================== */
+
+.team-graph-badge {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ff5a5f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+}
+
+/* ==========================================================
+   HANDLES — invisible connectors
+========================================================== */
+
+.team-graph-handle {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+  border: none;
+  opacity: 0;
+}
+
+/* ==========================================================
+   CONTROLS / MINIMAP
+========================================================== */
+
+.team-graph-wrapper .react-flow__controls {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.team-graph-wrapper .react-flow__controls-button {
+  background: #1e1f3c;
+  border-bottom: 1px solid #2c2d4e;
+}
+
+.team-graph-wrapper .react-flow__controls-button:hover {
+  background: #292a4d;
+}
+
+.team-graph-wrapper .react-flow__controls-button svg {
+  fill: #ddd;
+}
+
+.team-graph-wrapper .react-flow__minimap {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background: #1e1f3c;
+}
+
+/* ==========================================================
+   RESPONSIVE
+========================================================== */
+
+@media (max-width: 768px) {
+  .team-graph-node {
+    width: 110px;
+  }
+
+  .team-graph-card {
+    width: 100px;
+    min-height: 100px;
+    padding: 10px 6px;
+  }
+
+  .team-graph-root .team-graph-card {
+    min-height: 110px;
+  }
+
+  .team-graph-name {
+    font-size: 10px;
+  }
+}

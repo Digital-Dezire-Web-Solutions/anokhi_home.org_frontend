@@ -227,10 +227,10 @@ const Booking = ({ mood, setAlert, landingPage }) => {
     <div className="plot-container">
       {/* Filters */}
       <div className="table-filters">
-        {/* <div className="page-head-title">
+        <div className="page-head-title">
           <h2>Bookings</h2>
-          <Breadcrumb />
-        </div> */}
+          {/* <Breadcrumb /> */}
+        </div>
         <div className="page-tools">
           {(mood === "admin" || mood === "staff") && (
             <button

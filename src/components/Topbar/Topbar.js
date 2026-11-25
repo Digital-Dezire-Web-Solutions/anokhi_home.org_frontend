@@ -1,6 +1,356 @@
+// import React, { useEffect, useRef, useState } from "react";
+// import NiBell from "../../icons/ni-bell";
+// import { useNavigate } from "react-router-dom";
+// import NotificationModal from "../Modals/NotificationModal";
+// import NiUser from "../../icons/ni-user";
+// import { useDispatch, useSelector } from "react-redux";
+// import {
+//   getAccountDetails,
+//   getNotifications,
+//   getNotificationsCount,
+//   getOffers,
+//   readNotification,
+// } from "../../Redux/Slices/AppSlices";
+// import NiDrawr from "../../icons/ni-drawr";
+// import Breadcrumb from "../Breadcrumb/Breadcrumb";
+// import Host from "../../Host/Host";
+// import axios from "axios";
+// import "./Topbar.css";
+// import AddLocationModal from "../Modals/AddLocationModal";
+
+// function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
+//   const dispatch = useDispatch();
+//   const navigate = useNavigate();
+//   useEffect(() => {
+//     const token = localStorage.getItem("token");
+//     if (!token) {
+//       navigate("/");
+//     }
+//   }, []);
+
+//   const { userDetail, notificationsCount, notifications, offersData } =
+//     useSelector((state) => state.app);
+//   useEffect(() => {
+//     dispatch(getAccountDetails());
+//     dispatch(getNotificationsCount());
+//     dispatch(getNotifications());
+//     dispatch(getOffers());
+//   }, []);
+
+//   const currentUser = userDetail;
+//   const [openProfile, setOpenProfile] = useState(false);
+//   const [openNotif, setOpenNotif] = useState(false);
+//   const [sidebarOpen, setSidebarOpen] = useState(false);
+//   const profileRef = useRef();
+//   const notifRef = useRef();
+//   const [syncing, setSyncing] = useState(false);
+//   const [syncReport, setSyncReport] = useState(null);
+
+//   useEffect(() => {
+//     if (userDetail) {
+//       setMood(userDetail?.role);
+//     }
+//   }, [userDetail]);
+
+//   useEffect(() => {
+//     const handler = (e) => {
+//       if (
+//         profileRef.current &&
+//         !profileRef.current.contains(e.target) &&
+//         notifRef.current &&
+//         !notifRef.current.contains(e.target)
+//       ) {
+//         setOpenProfile(false);
+//         setOpenNotif(false);
+//       }
+//     };
+
+//     document.addEventListener("mousedown", handler);
+//     return () => document.removeEventListener("mousedown", handler);
+//   }, []);
+
+//   const handleLogout = () => {
+//     navigate("/");
+//     setMood("");
+//     localStorage.removeItem("token");
+//   };
+
+//   const handleRead = (id) => {
+//     dispatch(readNotification(id));
+//     dispatch(getNotificationsCount());
+//   };
+
+//   const handleReadAll = async () => {
+//     try {
+//       const token = localStorage.getItem("token");
+//       await axios.put(
+//         `${Host}/api/notification/read-all`,
+//         {},
+//         { headers: { "auth-token": token } },
+//       );
+//       dispatch(getNotifications());
+//       dispatch(getNotificationsCount());
+//     } catch (err) {
+//       console.log(err);
+//     }
+//   };
+
+//   const createSlug = (name) =>
+//     name
+//       .toLowerCase()
+//       .trim()
+//       .replace(/\s+/g, "-")
+//       .replace(/[^a-z0-9-]/g, "");
+
+//   const handleSync = async () => {
+//     if (
+//       !window.confirm(
+//         "Sync users, locations and colonies from the source database? This overwrites matching records in this database.",
+//       )
+//     )
+//       return;
+
+//     try {
+//       setSyncing(true);
+//       const token = localStorage.getItem("token");
+//       const { data } = await axios.post(
+//         `${Host}/api/auth/sync-data`,
+//         {},
+//         { headers: { "auth-token": token } },
+//       );
+//       setSyncReport(data.report);
+//     } catch (err) {
+//       console.log(err);
+//       setSyncReport({
+//         error: err.response?.data?.msg || "Sync failed",
+//       });
+//     } finally {
+//       setSyncing(false);
+//     }
+//   };
+
+//   return (
+//     <div className="topbar">
+//       <div className="topbar-box">
+//         <div className="top-left">
+//           <button
+//             className="mobile-btn"
+//             onClick={() => setMobileOpen((v) => !v)}
+//           >
+//             <NiDrawr />
+//           </button>
+//           <div
+//             className="page-head-title"
+//             style={{ margin: "0 0 0 10px", fontSize: "18px" }}
+//           >
+//             <h2 style={{ margin: "0", fontSize: "16px" }}>
+//               Welcome back, {userDetail?.name}
+//             </h2>
+//             <Breadcrumb />
+//           </div>
+//         </div>
+
+//         <div className="top-right">
+//           {/* Role Switch (Demo Only) */}
+//           {/* <select
+//           className="top-mood"
+//           value={mood}
+//           onChange={(e) => setMood(e.target.value)}
+//         >
+//           <option value="admin">Admin</option>
+//           <option value="agent">Agent</option>
+//           <option value="staff">Staff</option>
+//           <option value="user">User</option>
+//         </select> */}
+
+//           {/* Notifications */}
+//           {userDetail?.role === "admin" && (
+//             <button
+//               className="sync-btn"
+//               onClick={handleSync}
+//               disabled={syncing}
+//             >
+//               {syncing ? "Syncing..." : "Sync Data"}
+//             </button>
+//           )}
+//           <div
+//             className="notif"
+//             ref={notifRef}
+//             onClick={() => {
+//               setOpenNotif(!openNotif);
+//               setOpenProfile(false);
+//             }}
+//           >
+//             <NiBell />
+//             <span>{notificationsCount?.unread}</span>
+//             {openNotif && (
+//               <NotificationModal
+//                 notifications={notifications}
+//                 handleRead={handleRead}
+//                 handleReadAll={handleReadAll}
+//                 onClose={() => setOpenNotif(false)}
+//               />
+//             )}
+//           </div>
+
+//           {/* Dark Mode */}
+//           {/* <button className="top-mood" onClick={() => setDark(!dark)}>
+//             {dark ? <NiSun /> : <NiMoon />}
+//           </button> */}
+
+//           {/* PROFILE */}
+//           <div
+//             className="profile"
+//             ref={profileRef}
+//             onClick={() => {
+//               setOpenProfile(!openProfile);
+//               setOpenNotif(false);
+//             }}
+//           >
+//             <span>{currentUser?.user?.toUpperCase()}</span>
+
+//             {currentUser?.avatar ? (
+//               <img
+//                 src={currentUser.avatar}
+//                 alt={currentUser.name}
+//                 className="profile-avatar"
+//               />
+//             ) : (
+//               <NiUser />
+//             )}
+
+//             {openProfile && (
+//               <div className="profile-modal">
+//                 <div className="pm-header">
+//                   {currentUser?.avatar ? (
+//                     <img
+//                       src={currentUser.avatar}
+//                       alt={currentUser.name}
+//                       className="profile-avatar"
+//                     />
+//                   ) : (
+//                     <div className="profile-avatar-placeholder">
+//                       <NiUser />
+//                     </div>
+//                   )}
+//                   <h4>{currentUser?.name}</h4>
+//                   <p>{currentUser?.email}</p>
+//                 </div>
+
+//                 <div
+//                   className="pm-item"
+//                   onClick={() =>
+//                     navigate(`/user/${createSlug(currentUser.name)}`, {
+//                       state: currentUser._id,
+//                     })
+//                   }
+//                 >
+//                   My Profile
+//                 </div>
+
+//                 {/* <div className="pm-item">
+//                   Mode{" "}
+//                   <span onClick={() => setDark(!dark)}>
+//                     {dark ? <NiSun /> : <NiMoon />}
+//                   </span>
+//                 </div> */}
+
+//                 {/* <div
+//                   className="pm-item"
+//                   onClick={() => navigate(`/help-support`)}
+//                 >
+//                   Help and Support
+//                 </div>
+//                 <div className="pm-item" onClick={() => navigate(`/rating`)}>
+//                   Rating
+//                 </div> */}
+
+//                 <button className="pm-logout" onClick={handleLogout}>
+//                   Sign out
+//                 </button>
+//               </div>
+//             )}
+//           </div>
+//           {/* {mood !== "admin" && (
+//             <>
+//               <Floating />
+//               <div
+//                 className="floating-menu-btn"
+//                 onClick={() => setSidebarOpen(true)}
+//               >
+//                 <span>Offers & Bonenza</span>
+//               </div>
+//             </>
+//           )} */}
+//           {/* <div
+//             className={`sidebar-overlay ${sidebarOpen ? "active" : ""}`}
+//             onClick={() => setSidebarOpen(false)}
+//           >
+//             <div className="sidebar-popup" onClick={(e) => e.stopPropagation()}>
+//               <LuX
+//                 className="sidebar-close"
+//                 onClick={() => setSidebarOpen(false)}
+//               />
+
+//               <div className="sidebar-content">
+//                 <PosterView offersData={offersData} />
+//               </div>
+//             </div>
+//           </div> */}
+//         </div>
+//       </div>
+//       <AddLocationModal
+//         open={syncReport}
+//         onClose={() => {
+//           setSyncReport(false);
+//         }}
+//         title={"Sync Report"}
+//       >
+//         {syncReport && (
+//           <div className="" onClick={() => setSyncReport(null)}>
+//             <div className="" onClick={(e) => e.stopPropagation()}>
+//               {syncReport.error ? (
+//                 <p className="sync-error">{syncReport.error}</p>
+//               ) : (
+//                 Object.entries(syncReport).map(([name, s]) => (
+//                   <div key={name} className="sync-row">
+//                     <strong style={{ textTransform: "capitalize" }}>
+//                       {name}
+//                     </strong>
+//                     <span>
+//                       Source: {s.source} · Added: {s.upserted} · Updated:{" "}
+//                       {s.updated}
+//                     </span>
+//                     {s.errors?.length > 0 && (
+//                       <ul className="sync-error">
+//                         {s.errors.map((e, i) => (
+//                           <li key={i}>{e}</li>
+//                         ))}
+//                       </ul>
+//                     )}
+//                   </div>
+//                 ))
+//               )}
+//               <div className="modal-actions">
+//                 <button
+//                   onClick={() => setSyncReport(null)}
+//                 >
+//                   Close
+//                 </button>
+//               </div>
+//             </div>
+//           </div>
+//         )}
+//       </AddLocationModal>
+//     </div>
+//   );
+// }
+
+// export default Topbar;
+
 import React, { useEffect, useRef, useState } from "react";
 import NiBell from "../../icons/ni-bell";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import NotificationModal from "../Modals/NotificationModal";
 import NiUser from "../../icons/ni-user";
 import { useDispatch, useSelector } from "react-redux";
@@ -11,13 +361,19 @@ import {
   getOffers,
   readNotification,
 } from "../../Redux/Slices/AppSlices";
-import NiDrawr from "../../icons/ni-drawr";
 import Breadcrumb from "../Breadcrumb/Breadcrumb";
 import Host from "../../Host/Host";
 import axios from "axios";
 import "./Topbar.css";
 import AddLocationModal from "../Modals/AddLocationModal";
+import AdminLogo from "../../Assets/Logo/logo-anokhi-homes.png";
 
+/* TODO: point LOGO to your logo (public folder path or an imported image). */
+const LOGO = AdminLogo;
+const BRAND = "Anokhi Homes";
+
+/* setMobileOpen / dark props are kept so the parent does not break;
+   the side drawer is gone now that the menu lives at the bottom. */
 function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -40,7 +396,7 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
   const currentUser = userDetail;
   const [openProfile, setOpenProfile] = useState(false);
   const [openNotif, setOpenNotif] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [logoOk, setLogoOk] = useState(true);
   const profileRef = useRef();
   const notifRef = useRef();
   const [syncing, setSyncing] = useState(false);
@@ -129,41 +485,31 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
     }
   };
 
+  const initials = (currentUser?.name || BRAND)
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
   return (
-    <div className="topbar">
+    <header className="topbar">
       <div className="topbar-box">
         <div className="top-left">
-          <button
-            className="mobile-btn"
-            onClick={() => setMobileOpen((v) => !v)}
-          >
-            <NiDrawr />
-          </button>
-          <div
-            className="page-head-title"
-            style={{ margin: "0 0 0 10px", fontSize: "18px" }}
-          >
-            <h2 style={{ margin: "0", fontSize: "16px" }}>
-              Welcome back, {userDetail?.name}
-            </h2>
+          <Link to="/dashboard" className="brand" aria-label={`${BRAND} home`}>
+              <img
+                className="brand-logo"
+                src={LOGO}
+                alt={BRAND}
+                onError={() => setLogoOk(false)}
+              />
+          </Link>
+          <div className="top-crumb">
             <Breadcrumb />
           </div>
         </div>
 
         <div className="top-right">
-          {/* Role Switch (Demo Only) */}
-          {/* <select
-          className="top-mood"
-          value={mood}
-          onChange={(e) => setMood(e.target.value)}
-        >
-          <option value="admin">Admin</option>
-          <option value="agent">Agent</option>
-          <option value="staff">Staff</option>
-          <option value="user">User</option>
-        </select> */}
-
-          {/* Notifications */}
           {userDetail?.role === "admin" && (
             <button
               className="sync-btn"
@@ -173,16 +519,20 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
               {syncing ? "Syncing..." : "Sync Data"}
             </button>
           )}
+
           <div
             className="notif"
             ref={notifRef}
+            role="button"
+            tabIndex={0}
+            aria-label={`Notifications, ${notificationsCount?.unread ?? 0} unread`}
             onClick={() => {
               setOpenNotif(!openNotif);
               setOpenProfile(false);
             }}
           >
             <NiBell />
-            <span>{notificationsCount?.unread}</span>
+            <span>{notificationsCount?.unread ?? 0}</span>
             {openNotif && (
               <NotificationModal
                 notifications={notifications}
@@ -193,22 +543,17 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
             )}
           </div>
 
-          {/* Dark Mode */}
-          {/* <button className="top-mood" onClick={() => setDark(!dark)}>
-            {dark ? <NiSun /> : <NiMoon />}
-          </button> */}
-
-          {/* PROFILE */}
           <div
             className="profile"
             ref={profileRef}
+            role="button"
+            tabIndex={0}
+            aria-label="Profile menu"
             onClick={() => {
               setOpenProfile(!openProfile);
               setOpenNotif(false);
             }}
           >
-            <span>{currentUser?.user?.toUpperCase()}</span>
-
             {currentUser?.avatar ? (
               <img
                 src={currentUser.avatar}
@@ -216,11 +561,11 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
                 className="profile-avatar"
               />
             ) : (
-              <NiUser />
+              <span className="profile-initials">{initials}</span>
             )}
 
             {openProfile && (
-              <div className="profile-modal">
+              <div className="profile-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="pm-header">
                   {currentUser?.avatar ? (
                     <img
@@ -235,6 +580,9 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
                   )}
                   <h4>{currentUser?.name}</h4>
                   <p>{currentUser?.email}</p>
+                  {currentUser?.user && (
+                    <span className="pm-role">{currentUser.user}</span>
+                  )}
                 </div>
 
                 <div
@@ -248,57 +596,15 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
                   My Profile
                 </div>
 
-                {/* <div className="pm-item">
-                  Mode{" "}
-                  <span onClick={() => setDark(!dark)}>
-                    {dark ? <NiSun /> : <NiMoon />}
-                  </span>
-                </div> */}
-
-                {/* <div
-                  className="pm-item"
-                  onClick={() => navigate(`/help-support`)}
-                >
-                  Help and Support
-                </div>
-                <div className="pm-item" onClick={() => navigate(`/rating`)}>
-                  Rating
-                </div> */}
-
                 <button className="pm-logout" onClick={handleLogout}>
                   Sign out
                 </button>
               </div>
             )}
           </div>
-          {/* {mood !== "admin" && (
-            <>
-              <Floating />
-              <div
-                className="floating-menu-btn"
-                onClick={() => setSidebarOpen(true)}
-              >
-                <span>Offers & Bonenza</span>
-              </div>
-            </>
-          )} */}
-          {/* <div
-            className={`sidebar-overlay ${sidebarOpen ? "active" : ""}`}
-            onClick={() => setSidebarOpen(false)}
-          >
-            <div className="sidebar-popup" onClick={(e) => e.stopPropagation()}>
-              <LuX
-                className="sidebar-close"
-                onClick={() => setSidebarOpen(false)}
-              />
-
-              <div className="sidebar-content">
-                <PosterView offersData={offersData} />
-              </div>
-            </div>
-          </div> */}
         </div>
       </div>
+
       <AddLocationModal
         open={syncReport}
         onClose={() => {
@@ -332,17 +638,13 @@ function Topbar({ dark, setDark, setMobileOpen, mood, setMood }) {
                 ))
               )}
               <div className="modal-actions">
-                <button
-                  onClick={() => setSyncReport(null)}
-                >
-                  Close
-                </button>
+                <button onClick={() => setSyncReport(null)}>Close</button>
               </div>
             </div>
           </div>
         )}
       </AddLocationModal>
-    </div>
+    </header>
   );
 }
 

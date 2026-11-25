@@ -597,7 +597,7 @@ const Payout = ({ mood, setAlert }) => {
       <div className="table-filters">
         <div className="page-head-title">
           <h2>Payout</h2>
-          <Breadcrumb />
+          {/* <Breadcrumb /> */}
         </div>
       </div>
       <div className="dashboard-container">

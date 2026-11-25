@@ -67,8 +67,8 @@
 }
 
 .menu.active {
-  background: #b5b5b51e;
-  color: var(--mood-color);
+  background: var(--d-red);
+  color: white;
   font-weight: 600;
 }
 

@@ -591,7 +591,7 @@ const Other = ({ mood, setAlert, data }) => {
         <div className="table-filters">
           <div className="page-head-title">
             <h2>Users</h2>
-            <Breadcrumb />
+            {/* <Breadcrumb /> */}
           </div>
         </div>
 
@@ -615,7 +615,7 @@ const Other = ({ mood, setAlert, data }) => {
       <div className="table-filters">
         <div className="page-head-title">
           <h2>Users</h2>
-          <Breadcrumb />
+          {/* <Breadcrumb /> */}
         </div>
         <div className="page-tools">
           {(mood === "admin" || mood === "staff") && (

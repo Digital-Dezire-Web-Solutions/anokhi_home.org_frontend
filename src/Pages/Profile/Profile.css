@@ -7,8 +7,8 @@
 .profile-card {
   width: 100%;
   margin-bottom: 1rem;
-  background: #25271d;
-    color: white;
+  /* background: #25271d; */
+    color: black;
 }
 
 .profile-top {

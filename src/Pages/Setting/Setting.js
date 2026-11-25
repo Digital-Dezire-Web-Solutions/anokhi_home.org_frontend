@@ -133,7 +133,7 @@ const Setting = ({ mood, setAlert }) => {
       <div className="profile-grid">
         {/* LEFT SIDEBAR */}
         <div className="profile-sidebar">
-          <div className="profile-card card" style={{background:"#25271d"}}>
+          <div className="profile-card card">
             <div className="profile-nav">
               {TABS.map((tab) => (
                 <span
